@@ -1,0 +1,8 @@
+﻿case,expected_status,actual_status,num_vertices,diameter_m,covers_region,true_source_feasible,passed
+bounded_consistency,OK,OK,8,38.1343400894,True,True,True
+cross_zero,OK,OK,4,45.4143016072,True,True,True
+unbounded_single_wedge,UNBOUNDED,UNBOUNDED,1,,,,True
+empty_opposed_shifted,EMPTY,EMPTY,0,,,,True
+degenerate_shared_apex,DEGENERATE,DEGENERATE,1,0,True,True,True
+error_endpoint_inclusive,OK_OR_DEGENERATE,DEGENERATE,1,0,True,True,True
+equilateral_triangle_counterexample,NOT_COVERED,NOT_COVERED,3,1,False,,True

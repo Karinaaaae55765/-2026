@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "random_seed": 2026,
+  "deterministic_cases": 7,
+  "deterministic_cases_passed": 7,
+  "all_deterministic_passed": true,
+  "random_convex_polygons_compared": 250,
+  "max_main_baseline_diameter_difference": 0.0,
+  "random_comparison_passed": true,
+  "bounded_example": {
+    "num_vertices": 8,
+    "diameter_m": 38.13434008939585,
+    "diameter_circle_covers": true
+  },
+  "equilateral_triangle": {
+    "diameter": 1.0,
+    "diameter_circle_radius": 0.5,
+    "max_vertex_distance_from_circle_center": 0.8660254037844386,
+    "covers_region": false
+  },
+  "output_degeneracy": {
+    "empty_detected": true,
+    "unbounded_detected": true,
+    "degenerate_detected": true
+  }
+}

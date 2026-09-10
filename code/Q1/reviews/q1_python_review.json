@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "question_id": "Q1",
+  "reviewed_at": "2026-09-10T21:09:25+08:00",
+  "implementation_target": "python",
+  "approved_decision_id": "q1_model_assumptions_2026-09-10",
+  "reviewed_files": [
+    "code/Q1/q1_code_plan.md",
+    "code/Q1/q1_geometry.py",
+    "code/Q1/q1_baseline.py",
+    "code/Q1/run_all.py",
+    "tests/Q1/test_q1_geometry.py",
+    "results/Q1/experiments/round1/run_summary.json",
+    "results/Q1/experiments/round1/tables/validation_cases.csv",
+    "results/Q1/experiments/round1/metrics/q1_metrics.json",
+    "results/Q1/experiments/round1/figures/q1_example.png"
+  ],
+  "checks": {
+    "syntax": {
+      "status": "PASS",
+      "evidence": [
+        "Python 3.14.5 py_compile passed for all implementation scripts and the test module.",
+        "Eight unittest cases ran without exceptions or failures."
+      ]
+    },
+    "input_contract": {
+      "status": "PASS",
+      "evidence": [
+        "The public API validates required observation fields, finite coordinate and bearing values, delta range, and tolerance range.",
+        "Bearings are normalized internally and no slope representation is used, including the 0/360 degree crossing test."
+      ]
+    },
+    "method_alignment": {
+      "status": "PASS",
+      "evidence": [
+        "Each observation is implemented as the two closed cross-product half-plane constraints stated in model_assumptions.md.",
+        "Feasible boundary intersections are deduplicated, reduced to a CCW convex hull, and evaluated by rotating calipers.",
+        "The diameter-endpoint circle uses the endpoint midpoint and checks the maximum distance over hull vertices.",
+        "No arena clipping, reception radius, channel, movement, simulator, fitting, or probabilistic error model was added."
+      ]
+    },
+    "reproducibility": {
+      "status": "PASS",
+      "evidence": [
+        "The validation seed is fixed at 2026 and the runtime records Python, platform, NumPy, and Matplotlib versions.",
+        "Two consecutive validation runs produced byte-identical q1_metrics.json content."
+      ]
+    },
+    "output_contract": {
+      "status": "PASS",
+      "evidence": [
+        "All seven deterministic validation rows passed and all 250 randomized convex-polygon comparisons matched the brute-force baseline exactly.",
+        "EMPTY, UNBOUNDED, and DEGENERATE states were each exercised and correctly reported.",
+        "The CSV table, metrics JSON, diagnostic PNG, and canonical run_summary.json exist and agree."
+      ]
+    },
+    "numerical_and_edge_cases": {
+      "status": "PASS",
+      "evidence": [
+        "The tests cover angle wraparound, inclusive +/-1 degree endpoints, bounded and unbounded intersections, empty intersections, and zero-diameter degeneration.",
+        "An equilateral-triangle counterexample correctly returns diameter 1, circle radius 0.5, maximum vertex distance sqrt(3)/2, and no coverage."
+      ]
+    }
+  },
+  "findings": [],
+  "warnings": [
+    "No official numeric Q1 observation set was supplied; reported numeric localization diameters belong to constructed validation cases.",
+    "The bundled artifact Python lacked Matplotlib; execution used system Python 3.14.5 with NumPy 2.5.1 and Matplotlib 3.11.0."
+  ],
+  "verdict": "PASS"
+}

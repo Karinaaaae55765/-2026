@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "question": "Q1",
+  "round": "round1",
+  "implementation_target": "python",
+  "random_seed": 2026,
+  "approved_decision_id": "q1_model_assumptions_2026-09-10",
+  "methods": [
+    {
+      "method_id": "wedge_intersection_rotating_calipers",
+      "role": "main",
+      "script": "code/Q1/q1_geometry.py",
+      "status": "success",
+      "execution_time_seconds": 0.78240630000073,
+      "input_files": [
+        "model_assumptions.md"
+      ],
+      "output_files": [
+        "results\\Q1\\experiments\\round1\\tables\\validation_cases.csv",
+        "results\\Q1\\experiments\\round1\\metrics\\q1_metrics.json"
+      ],
+      "figure_files": [
+        "results\\Q1\\experiments\\round1\\figures\\q1_example.png"
+      ],
+      "metrics_summary": {
+        "deterministic_cases_passed": 7,
+        "deterministic_cases": 7,
+        "random_comparison_passed": true
+      },
+      "warnings": [
+        "No official numeric Q1 observation set was supplied; validation uses deterministic constructed cases."
+      ],
+      "errors": []
+    },
+    {
+      "method_id": "vertex_pair_enumeration",
+      "role": "usable_baseline",
+      "script": "code/Q1/q1_baseline.py",
+      "status": "success",
+      "execution_time_seconds": 0.78240630000073,
+      "input_files": [],
+      "output_files": [
+        "results\\Q1\\experiments\\round1\\metrics\\q1_metrics.json"
+      ],
+      "figure_files": [],
+      "metrics_summary": {
+        "max_diameter_difference": 0.0
+      },
+      "warnings": [],
+      "errors": []
+    }
+  ],
+  "comparison": {
+    "metric": "absolute diameter difference",
+    "cases": 250,
+    "maximum_difference": 0.0,
+    "passed": true
+  },
+  "fallback_trigger": {
+    "fallback_id": null,
+    "condition": null,
+    "observed": false,
+    "evidence": null
+  },
+  "environment": {
+    "python": "3.14.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "numpy": "2.5.1",
+    "matplotlib": "3.11.0"
+  }
+}
