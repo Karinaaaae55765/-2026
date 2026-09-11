@@ -1,7 +1,8 @@
-"""Run deterministic Q1 validation cases and save round-1 evidence."""
+"""Run deterministic Q1 validation cases and save round-2 evidence."""
 
 from __future__ import annotations
 
+import argparse
 import csv
 import hashlib
 import json
@@ -44,7 +45,51 @@ def save_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def main() -> None:
+def _yes_no(value: bool) -> str:
+    return "是" if value else "否"
+
+
+def print_chinese_summary(success: bool, metrics: dict, summary_path: Path) -> None:
+    """Print a concise human-readable summary while JSON remains on disk."""
+    degeneracy = metrics["output_degeneracy"]
+    bounded = metrics["bounded_example"]
+    triangle = metrics["equilateral_triangle"]
+    print("========== Q1 几何模块运行结果 ==========")
+    print(f"运行状态：{'成功' if success else '失败'}")
+    print()
+    print(
+        f"定向测试：{metrics['deterministic_cases_passed']} / "
+        f"{metrics['deterministic_cases']} 通过"
+    )
+    print(f"随机凸多边形直径对照：{metrics['random_convex_polygons_compared']} 组")
+    print(
+        "旋转卡壳与暴力枚举最大差值："
+        f"{metrics['max_main_baseline_diameter_difference']:.12g} m"
+    )
+    print(f"随机对照是否通过：{_yes_no(metrics['random_comparison_passed'])}")
+    print(f"观测顺序不变性：{_yes_no(metrics['observation_order_invariance_passed'])}")
+    print()
+    print("正常定位案例：")
+    print(f"  定位区域顶点数：{bounded['num_vertices']}")
+    print(f"  区域直径：{bounded['diameter_m']:.6f} m")
+    print(f"  直径圆是否覆盖区域：{_yes_no(bounded['diameter_circle_covers'])}")
+    print()
+    print("等边三角形反例：")
+    print(f"  区域直径：{triangle['diameter']:.6f} m")
+    print(f"  直径圆半径：{triangle['diameter_circle_radius']:.6f} m")
+    print(f"  是否覆盖：{_yes_no(triangle['covers_region'])}")
+    print()
+    print("异常状态识别：")
+    print(f"  空集：{_yes_no(degeneracy['empty_detected'])}")
+    print(f"  无界区域：{_yes_no(degeneracy['unbounded_detected'])}")
+    print(f"  退化区域：{_yes_no(degeneracy['degenerate_detected'])}")
+    print()
+    print("说明：当前数值来自构造的验证案例，不是题目官方观测数据。")
+    print(f"完整运行记录：{summary_path}")
+    print("=========================================")
+
+
+def main(json_output: bool = False) -> None:
     started = time.perf_counter()
     tables_dir = ROUND_DIR / "tables"
     metrics_dir = ROUND_DIR / "metrics"
@@ -285,10 +330,26 @@ def main() -> None:
     summary_path = ROUND_DIR / "run_summary.json"
     save_json(summary_path, run_summary)
 
-    print(json.dumps({"success": success, "metrics": metrics, "run_summary": str(summary_path)}, ensure_ascii=False, indent=2))
+    if json_output:
+        print(
+            json.dumps(
+                {"success": success, "metrics": metrics, "run_summary": str(summary_path)},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+    else:
+        print_chinese_summary(success, metrics, summary_path)
     if not success:
         raise SystemExit(1)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="以机器可读 JSON 输出终端结果；默认输出中文摘要。",
+    )
+    arguments = parser.parse_args()
+    main(json_output=arguments.json)

@@ -13,7 +13,7 @@
       "role": "main",
       "script": "code/Q1/q1_geometry.py",
       "status": "success",
-      "execution_time_seconds": 0.6128500999911921,
+      "execution_time_seconds": 0.8827239999955054,
       "input_files": [
         "model_assumptions.md"
       ],
@@ -40,7 +40,7 @@
       "role": "usable_baseline",
       "script": "code/Q1/q1_baseline.py",
       "status": "success",
-      "execution_time_seconds": 0.6128500999911921,
+      "execution_time_seconds": 0.8827239999955054,
       "input_files": [],
       "output_files": [
         "results/Q1/experiments/round2/metrics/q1_metrics.json"
