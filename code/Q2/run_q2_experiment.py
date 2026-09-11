@@ -26,13 +26,13 @@ from q2_robust_second_measurement_optimizer import (
     candidate_metrics,
     classify_candidates,
     evaluate_candidate,
-    farthest_point_scenarios,
     old_two_wedge_status,
     optimize,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "results" / "Q2" / "experiments" / "round3"
+QUICK_OUTPUT = ROOT / "results" / "Q2" / "experiments" / "quick_check"
 ASSUMPTIONS = ROOT / "model_assumptions.md"
 plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "DejaVu Sans"]
 plt.rcParams["axes.unicode_minus"] = False
@@ -144,27 +144,6 @@ def _plot_regions(config, omega, region, main, baseline, path: Path) -> None:
     plt.close(fig)
 
 
-def _plot_objective(config, omega, feasible, main, path: Path) -> None:
-    scenarios = farthest_point_scenarios(omega.scenario_pool, config.scenario_count)
-    errors = np.linspace(-config.bearing_error_deg, config.bearing_error_deg, config.error_scenario_count)
-    values = [
-        evaluate_candidate(point, omega.outer_polygon, scenarios, errors, config).radius_m
-        for point in feasible
-    ]
-    fig, ax = plt.subplots(figsize=(5.4, 7.4), constrained_layout=True)
-    scatter = ax.scatter(feasible[:, 0], feasible[:, 1], c=values, s=55, cmap="viridis")
-    ax.scatter(main["x"], main["y"], s=120, marker="*", color="#e41a1c", label="M2-RR")
-    ax.set_xlabel("x（m，向东）")
-    ax.set_ylabel("y（m，向北）")
-    ax.set_aspect("equal", adjustable="box")
-    ax.grid(alpha=0.25)
-    ax.legend(loc="best")
-    fig.colorbar(scatter, ax=ax).set_label("离散最坏最小包围圆半径（m）")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=300)
-    plt.close(fig)
-
-
 def _boundary_checks(config: Q2Config, omega, main, evidence) -> list[dict]:
     test_point = np.array([[500.0, 800.0]])
     test_class = classify_candidates(test_point, omega.scenario_pool, config)
@@ -202,18 +181,40 @@ def _boundary_checks(config: Q2Config, omega, main, evidence) -> list[dict]:
     ]
 
 
-def run(base: Q2Config | None = None) -> dict:
+def _progress(message: str, started: float, enabled: bool) -> None:
+    if enabled:
+        print(f"[Q2 已运行 {time.perf_counter() - started:6.1f} 秒] {message}", flush=True)
+
+
+def run(
+    base: Q2Config | None = None,
+    *,
+    quick: bool = False,
+    show_progress: bool = False,
+) -> dict:
     started = time.perf_counter()
     base = base or Q2Config()
+    output_dir = QUICK_OUTPUT if quick else OUTPUT
     assumption_hash = hashlib.sha256(ASSUMPTIONS.read_bytes()).hexdigest()
-    levels = [
-        ("coarse", replace(base, disk_sides=48, scenario_pool_count=400, candidate_step_m=150.0, candidate_region_step_m=100.0, refinement_step_m=50.0, scenario_count=15, error_scenario_count=3)),
-        ("medium", replace(base, disk_sides=96, scenario_pool_count=625, candidate_step_m=100.0, candidate_region_step_m=75.0, refinement_step_m=25.0, scenario_count=25, error_scenario_count=5)),
-        ("fine", replace(base, disk_sides=160, scenario_pool_count=900, candidate_step_m=100.0, candidate_region_step_m=50.0, refinement_step_m=25.0, scenario_count=41, error_scenario_count=7)),
-    ]
+    if quick:
+        levels = [
+            ("quick", replace(base, disk_sides=48, scenario_pool_count=225, candidate_step_m=200.0, candidate_region_step_m=100.0, refinement_step_m=100.0, scenario_count=7, error_scenario_count=3))
+        ]
+    else:
+        levels = [
+            ("coarse", replace(base, disk_sides=48, scenario_pool_count=400, candidate_step_m=150.0, candidate_region_step_m=100.0, refinement_step_m=50.0, scenario_count=15, error_scenario_count=3)),
+            ("medium", replace(base, disk_sides=96, scenario_pool_count=625, candidate_step_m=100.0, candidate_region_step_m=75.0, refinement_step_m=25.0, scenario_count=25, error_scenario_count=5)),
+            ("fine", replace(base, disk_sides=160, scenario_pool_count=900, candidate_step_m=100.0, candidate_region_step_m=50.0, refinement_step_m=25.0, scenario_count=41, error_scenario_count=7)),
+        ]
+    _progress(
+        "开始快速检查（低分辨率，不作为论文正式结果）" if quick else "开始正式计算（三档分辨率）",
+        started,
+        show_progress,
+    )
     sensitivity = []
-    canonical = canonical_evidence = canonical_omega = canonical_feasible = None
+    canonical = canonical_evidence = canonical_omega = None
     for level, config in levels:
+        _progress(f"正在计算主方法：{level} 分辨率", started, show_progress)
         result, evidence, omega, feasible = optimize(config, "M2-RR")
         sensitivity.append(
             {
@@ -229,15 +230,22 @@ def run(base: Q2Config | None = None) -> dict:
                 "worst_radius_m": "" if result is None else result.discretized_worst_radius_m,
             }
         )
-        if level == "fine":
-            canonical, canonical_evidence, canonical_omega, canonical_feasible = result, evidence, omega, feasible
+        _progress(
+            f"{level} 分辨率完成；响应候选点 {evidence['coarse_signal_candidate_count']} 个",
+            started,
+            show_progress,
+        )
+        if level == levels[-1][0]:
+            canonical, canonical_evidence, canonical_omega = result, evidence, omega
     if canonical is None:
         raise RuntimeError("条件接收候选域为空")
     fine_config = levels[-1][1]
+    _progress("正在计算交会角基线", started, show_progress)
     baseline, baseline_evidence, _, _ = run_angle_baseline(fine_config)
     if baseline is None:
         raise RuntimeError("基线没有找到条件接收候选点")
 
+    _progress("正在生成完整候选区域网格", started, show_progress)
     region = build_candidate_region_samples(canonical_omega, fine_config)
     region_summary = _region_summary(region, fine_config)
     region_rows = _region_rows(region, fine_config)
@@ -263,24 +271,24 @@ def run(base: Q2Config | None = None) -> dict:
             }
         )
 
-    table_dir = OUTPUT / "tables"
-    figure_dir = OUTPUT / "figures"
+    table_dir = output_dir / "tables"
+    figure_dir = output_dir / "figures"
     paths = {
         "candidate_region": table_dir / "candidate_region.csv",
         "comparison": table_dir / "candidate_comparison.csv",
         "sensitivity": table_dir / "sensitivity.csv",
         "boundary": table_dir / "boundary_validation.csv",
         "candidate_figure": figure_dir / "q2_candidate_region.png",
-        "objective_figure": figure_dir / "q2_objective_map.png",
-        "metrics": OUTPUT / "metrics" / "q2_metrics.json",
-        "summary": OUTPUT / "run_summary.json",
+        "metrics": output_dir / "metrics" / "q2_metrics.json",
+        "summary": output_dir / "run_summary.json",
     }
+    _progress("正在写入表格并生成候选区域图", started, show_progress)
     _write_csv(paths["candidate_region"], region_rows)
     _write_csv(paths["comparison"], comparison)
     _write_csv(paths["sensitivity"], sensitivity)
     _write_csv(paths["boundary"], checks)
     _plot_regions(fine_config, canonical_omega, region, canonical.to_dict(), baseline.to_dict(), paths["candidate_figure"])
-    _plot_objective(fine_config, canonical_omega, canonical_feasible, canonical.to_dict(), paths["objective_figure"])
+    _progress("主算法计算完成；目标函数图请用独立脚本按需生成", started, show_progress)
 
     metrics = {
         "schema_version": 1,
@@ -304,7 +312,8 @@ def run(base: Q2Config | None = None) -> dict:
     summary = {
         "schema_version": 1,
         "question": "Q2",
-        "round": "round3",
+        "round": "quick_check" if quick else "round3",
+        "execution_mode": "quick" if quick else "formal",
         "implementation_target": "python",
         "random_seed": fine_config.seed,
         "config": asdict(fine_config),
@@ -330,6 +339,7 @@ def run(base: Q2Config | None = None) -> dict:
         "environment": {"python": sys.version.split()[0], "platform": platform.platform(), "numpy": np.__version__, "matplotlib": matplotlib.__version__},
     }
     _write_json(paths["summary"], summary)
+    _progress(f"全部完成，结果目录：{output_dir}", started, show_progress)
     return summary
 
 
@@ -352,7 +362,8 @@ def print_chinese_summary(summary: dict) -> None:
     print(f"  网格步长：{region['grid_step_m']:.3f} m")
     print(f"  响应候选点：{region['signal_grid_point_count']} 个，近似面积：{region['signal_approx_area_m2']:.3f} 平方米")
     print(f"  示向候选点：{region['bearing_grid_point_count']} 个，近似面积：{region['bearing_approx_area_m2']:.3f} 平方米")
-    print(f"  完整候选点文件：{OUTPUT / 'tables' / 'candidate_region.csv'}")
+    print(f"  运行模式：{'快速检查' if summary['execution_mode'] == 'quick' else '正式计算'}")
+    print(f"  完整候选点文件：{ROOT / summary['outputs']['candidate_region']}")
     print("  注：面积和边界依赖网格分辨率，不是解析精确值。")
     print()
     print("主方法 M2-RR：")
@@ -379,9 +390,14 @@ if __name__ == "__main__":
     parser.add_argument("--arena-x", type=float, default=0.0)
     parser.add_argument("--arena-y", type=float, default=0.0)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--quick",
+        action="store_true",
+        help="运行低分辨率快速检查并写入独立quick_check目录",
+    )
     args = parser.parse_args()
     config = Q2Config(s1_x=args.s1_x, s1_y=args.s1_y, first_bearing_deg=args.first_bearing_deg, arena_x=args.arena_x, arena_y=args.arena_y)
-    result = run(config)
+    result = run(config, quick=args.quick, show_progress=not args.json)
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:

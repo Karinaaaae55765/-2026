@@ -2,6 +2,7 @@
   "schema_version": 1,
   "question": "Q2",
   "round": "round3",
+  "execution_mode": "formal",
   "implementation_target": "python",
   "random_seed": 2026,
   "config": {
@@ -28,7 +29,7 @@
   },
   "approved_decision_id": "q2_conditional_reception_2026-09-11",
   "status": "success",
-  "execution_time_seconds": 150.4920345999999,
+  "execution_time_seconds": 135.27669779999997,
   "model_assumptions_file": "model_assumptions.md",
   "model_assumptions_sha256": "377fd28655dcea14241abe67ae677f36c0a52a8c9ef54b6de735c2c171777f91",
   "candidate_regions": {
@@ -186,7 +187,6 @@
     "sensitivity": "results/Q2/experiments/round3/tables/sensitivity.csv",
     "boundary": "results/Q2/experiments/round3/tables/boundary_validation.csv",
     "candidate_figure": "results/Q2/experiments/round3/figures/q2_candidate_region.png",
-    "objective_figure": "results/Q2/experiments/round3/figures/q2_objective_map.png",
     "metrics": "results/Q2/experiments/round3/metrics/q2_metrics.json"
   },
   "environment": {

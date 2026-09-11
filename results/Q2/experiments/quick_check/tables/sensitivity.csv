@@ -1,0 +1,2 @@
+﻿level,disk_sides,target_scenarios,error_scenarios,candidate_step_m,signal_candidate_count,bearing_candidate_count,x_m,y_m,worst_radius_m
+quick,48,7,3,200.0,29,29,800.0,-600.0,45.19742199974626

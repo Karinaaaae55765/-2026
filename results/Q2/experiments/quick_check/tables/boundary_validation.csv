@@ -1,0 +1,8 @@
+﻿case,observed,passed
+conditional_radius_recovers_valid_point,new=True; old=False,True
+near_is_success_branch,near_scenarios=1,True
+same_location_excluded,signal_count=0,True
+canonical_p2_bounded,old=UNBOUNDED; new_vertices=3,True
+cross_zero_first_bearing,outer_vertices=3,True
+error_endpoints_included,True,True
+main_signal_margin,margin=3.942305231,True
