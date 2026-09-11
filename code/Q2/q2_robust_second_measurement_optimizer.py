@@ -39,10 +39,12 @@ class Q2Config:
     disk_sides: int = 128
     scenario_pool_count: int = 900
     candidate_step_m: float = 100.0
+    candidate_region_step_m: float = 50.0
     refinement_step_m: float = 25.0
     scenario_count: int = 41
     error_scenario_count: int = 7
     tie_tolerance_m: float = 1e-8
+    same_location_tolerance_m: float = 1e-6
     seed: int = 2026
 
 
@@ -62,6 +64,8 @@ class ScenarioEvaluation:
     target: np.ndarray
     error_deg: float
     polygon: np.ndarray
+    near_scenario_count: int
+    bearing_scenario_count: int
 
 
 @dataclass
@@ -77,8 +81,11 @@ class CandidateResult:
     worst_target_x: float
     worst_target_y: float
     worst_error_deg: float
-    certified_min_distance_m: float
-    certified_max_distance_m: float
+    sampled_signal_margin_m: float
+    sampled_min_distance_m: float
+    sampled_max_distance_m: float
+    near_scenario_count: int
+    bearing_scenario_count: int
     min_angle_sine: float
     meets_20m_on_discretization: bool
 
@@ -98,8 +105,10 @@ def _validate_config(config: Q2Config) -> None:
         config.guaranteed_radius_m,
         config.maximum_radius_m,
         config.candidate_step_m,
+        config.candidate_region_step_m,
         config.refinement_step_m,
         config.tie_tolerance_m,
+        config.same_location_tolerance_m,
     ) <= 0.0:
         raise ValueError("半径、网格步长和容差必须为正数")
     if config.near_radius_m >= config.maximum_radius_m:
@@ -312,28 +321,71 @@ def _long_axis_normal_seeds(omega_outer: np.ndarray, config: Q2Config) -> np.nda
     normal = eigenvectors[:, int(np.argmin(eigenvalues))]
     radii = np.arange(
         0.0,
-        config.guaranteed_radius_m + config.candidate_step_m * 0.5,
+        config.maximum_radius_m + config.candidate_step_m * 0.5,
         config.candidate_step_m / 2.0,
     )
     return np.asarray([center + sign * radius * normal for radius in radii for sign in (-1.0, 1.0)])
 
 
-def distance_extrema(candidates: np.ndarray, omega_outer: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    minimum = np.asarray([_point_polygon_distance(point, omega_outer) for point in candidates])
-    maximum = np.max(
-        np.linalg.norm(candidates[:, None, :] - omega_outer[None, :, :], axis=2), axis=1
-    )
-    return minimum, maximum
+def candidate_metrics(
+    candidates: np.ndarray,
+    targets: np.ndarray,
+    config: Q2Config,
+    batch_size: int = 128,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """返回条件接收余量、最近/最远目标距离及移动距离。
+
+    第一次成功检测后，对给定目标G仍相容的最小接收半径为
+    max(1000, distance(S1,G))。余量非负即表示第二点在所有离散联合场景下
+    均能收到信号。
+    """
+    s1 = np.array([config.s1_x, config.s1_y])
+    first_distances = np.linalg.norm(targets - s1, axis=1)
+    conditional_radii = np.maximum(config.guaranteed_radius_m, first_distances)
+    margins = np.empty(len(candidates))
+    minimum = np.empty(len(candidates))
+    maximum = np.empty(len(candidates))
+    for start in range(0, len(candidates), batch_size):
+        batch = candidates[start : start + batch_size]
+        distances = np.linalg.norm(batch[:, None, :] - targets[None, :, :], axis=2)
+        margins[start : start + len(batch)] = np.min(
+            conditional_radii[None, :] - distances, axis=1
+        )
+        minimum[start : start + len(batch)] = distances.min(axis=1)
+        maximum[start : start + len(batch)] = distances.max(axis=1)
+    movement = np.linalg.norm(candidates - s1, axis=1)
+    return margins, minimum, maximum, movement
 
 
-def feasible_candidates(
-    candidates: np.ndarray, omega_outer: np.ndarray, config: Q2Config
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    minimum, maximum = distance_extrema(candidates, omega_outer)
-    mask = (maximum <= config.guaranteed_radius_m + 1e-9) & (
-        minimum > config.near_radius_m + config.tie_tolerance_m
-    )
-    return candidates[mask], minimum[mask], maximum[mask]
+def classify_candidates(
+    candidates: np.ndarray,
+    targets: np.ndarray,
+    config: Q2Config,
+) -> dict[str, np.ndarray]:
+    margins, minimum, maximum, movement = candidate_metrics(candidates, targets, config)
+    different_location = movement > config.same_location_tolerance_m
+    signal_mask = (margins >= -config.tie_tolerance_m) & different_location
+    bearing_mask = signal_mask & (minimum > config.near_radius_m + config.tie_tolerance_m)
+    return {
+        "all": candidates,
+        "signal": candidates[signal_mask],
+        "bearing": candidates[bearing_mask],
+        "signal_mask": signal_mask,
+        "bearing_mask": bearing_mask,
+        "signal_margin_m": margins,
+        "minimum_distance_m": minimum,
+        "maximum_distance_m": maximum,
+        "movement_m": movement,
+    }
+
+
+def build_candidate_region_samples(
+    omega: Omega1Approximation, config: Q2Config, step_m: float | None = None
+) -> dict[str, np.ndarray]:
+    """离散输出C_sig和C_bearing；它们是候选区域的网格近似。"""
+    step = config.candidate_region_step_m if step_m is None else step_m
+    grid = candidate_grid(omega.outer_polygon, step, config.maximum_radius_m)
+    return classify_candidates(grid, omega.scenario_pool, config)
 
 
 def farthest_point_scenarios(points: np.ndarray, count: int) -> np.ndarray:
@@ -352,10 +404,18 @@ def build_p2_outer_polygon(
     sensor: np.ndarray,
     measured_bearing_deg: float,
     bearing_error_deg: float,
+    maximum_radius_m: float | None = None,
+    disk_sides: int = 128,
 ) -> np.ndarray:
-    """显式构造有界外包络P2=Omega1_outer与W2的交集。"""
+    """显式构造P2=Omega1_outer与W2的交集，并保留第二次接收上界。"""
+    base = omega_outer
+    if maximum_radius_m is not None:
+        second_range = _circle_polygon(
+            (float(sensor[0]), float(sensor[1])), maximum_radius_m, disk_sides, True
+        )
+        base = _intersect_convex_polygons(base, second_range)
     return _clip_by_wedge(
-        omega_outer,
+        base,
         (float(sensor[0]), float(sensor[1])),
         measured_bearing_deg,
         bearing_error_deg,
@@ -381,16 +441,36 @@ def evaluate_candidate(
     config: Q2Config,
 ) -> ScenarioEvaluation:
     worst: ScenarioEvaluation | None = None
+    near_count = 0
+    bearing_count = 0
     for target in scenarios:
+        if float(np.linalg.norm(target - candidate)) <= config.near_radius_m:
+            near_count += 1
+            current = ScenarioEvaluation(
+                0.0,
+                0.0,
+                Circle(float(target[0]), float(target[1]), 0.0),
+                target.copy(),
+                math.nan,
+                np.asarray([target.copy()]),
+                0,
+                0,
+            )
+            if worst is None or current.radius_m > worst.radius_m:
+                worst = current
+            continue
         true_bearing = math.degrees(
             math.atan2(target[1] - candidate[1], target[0] - candidate[0])
         )
         for error in errors_deg:
+            bearing_count += 1
             polygon = build_p2_outer_polygon(
                 omega_outer,
                 candidate,
                 true_bearing + float(error),
                 config.bearing_error_deg,
+                config.maximum_radius_m,
+                config.disk_sides,
             )
             if len(polygon) == 0:
                 current = ScenarioEvaluation(
@@ -400,6 +480,8 @@ def evaluate_candidate(
                     target.copy(),
                     float(error),
                     polygon,
+                    0,
+                    0,
                 )
             else:
                 circle = minimum_enclosing_circle(polygon, seed=config.seed)
@@ -413,11 +495,22 @@ def evaluate_candidate(
                     target.copy(),
                     float(error),
                     polygon,
+                    0,
+                    0,
                 )
             if worst is None or current.radius_m > worst.radius_m:
                 worst = current
     assert worst is not None
-    return worst
+    return ScenarioEvaluation(
+        worst.radius_m,
+        worst.diameter_m,
+        worst.circle,
+        worst.target,
+        worst.error_deg,
+        worst.polygon,
+        near_count,
+        bearing_count,
+    )
 
 
 def _choose_main(
@@ -452,26 +545,26 @@ def optimize(
     if method not in {"M2-RR", "M2-ANGLE"}:
         raise ValueError("method必须是M2-RR或M2-ANGLE")
     omega = build_omega1(config)
-    grid = candidate_grid(omega.outer_polygon, config.candidate_step_m, config.guaranteed_radius_m)
+    grid = candidate_grid(omega.outer_polygon, config.candidate_step_m, config.maximum_radius_m)
     seeds = _long_axis_normal_seeds(omega.outer_polygon, config)
     coarse = np.unique(np.round(np.vstack((grid, seeds)), 9), axis=0)
-    feasible, _, _ = feasible_candidates(coarse, omega.outer_polygon, config)
+    classified = classify_candidates(coarse, omega.scenario_pool, config)
+    feasible = classified["signal"]
     evidence: dict[str, float | int | bool] = {
         "omega_outer_vertices": len(omega.outer_polygon),
         "omega_inner_vertices": len(omega.inner_polygon),
         "scenario_pool_count": len(omega.scenario_pool),
         "circle_outer_gap_m": omega.circle_outer_gap_m,
         "coarse_grid_and_seed_count": len(coarse),
-        "coarse_feasible_count": len(feasible),
+        "coarse_signal_candidate_count": len(feasible),
+        "coarse_bearing_candidate_count": len(classified["bearing"]),
         "fallback_triggered": len(feasible) == 0,
-        "candidate_guarantee_uses_outer_omega": True,
+        "conditional_reception_model": True,
     }
     if len(feasible) == 0:
-        _, maximum = distance_extrema(coarse, omega.outer_polygon)
-        evidence["minimum_certified_max_distance_m"] = float(maximum.min())
-        evidence["minimum_reception_violation_m"] = float(
-            max(0.0, maximum.min() - config.guaranteed_radius_m)
-        )
+        best_margin = float(np.max(classified["signal_margin_m"]))
+        evidence["best_sampled_signal_margin_m"] = best_margin
+        evidence["minimum_reception_violation_m"] = max(0.0, -best_margin)
         return None, evidence, omega, feasible
 
     scenarios = farthest_point_scenarios(omega.scenario_pool, config.scenario_count)
@@ -491,7 +584,8 @@ def optimize(
         config.refinement_step_m,
     )
     local = np.asarray([chosen + (dx, dy) for dx in offsets for dy in offsets])
-    local_feasible, _, _ = feasible_candidates(local, omega.outer_polygon, config)
+    local_classified = classify_candidates(local, omega.scenario_pool, config)
+    local_feasible = local_classified["signal"]
     if len(local_feasible):
         chosen = (
             _choose_main(local_feasible, omega.outer_polygon, scenarios, errors, config)
@@ -499,7 +593,9 @@ def optimize(
             else _choose_angle(local_feasible, scenarios, config)
         )
 
-    minimum, maximum = distance_extrema(chosen[None, :], omega.outer_polygon)
+    margins, minimum, maximum, _ = candidate_metrics(
+        chosen[None, :], omega.scenario_pool, config
+    )
     evaluation = evaluate_candidate(chosen, omega.outer_polygon, scenarios, errors, config)
     s1 = np.array([config.s1_x, config.s1_y])
     result = CandidateResult(
@@ -514,12 +610,16 @@ def optimize(
         worst_target_x=float(evaluation.target[0]),
         worst_target_y=float(evaluation.target[1]),
         worst_error_deg=float(evaluation.error_deg),
-        certified_min_distance_m=float(minimum[0]),
-        certified_max_distance_m=float(maximum[0]),
+        sampled_signal_margin_m=float(margins[0]),
+        sampled_min_distance_m=float(minimum[0]),
+        sampled_max_distance_m=float(maximum[0]),
+        near_scenario_count=evaluation.near_scenario_count,
+        bearing_scenario_count=evaluation.bearing_scenario_count,
         min_angle_sine=_minimum_angle_sine(chosen, scenarios, s1),
         meets_20m_on_discretization=bool(evaluation.radius_m <= 20.0),
     )
     evidence["local_feasible_count"] = len(local_feasible)
+    evidence["local_bearing_candidate_count"] = len(local_classified["bearing"])
     evidence["scenario_count"] = len(scenarios)
     evidence["error_scenario_count"] = len(errors)
     evidence["error_endpoints_included"] = bool(

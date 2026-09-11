@@ -1,4 +1,4 @@
-"""运行Q2鲁棒第二检测点、交会角基线及收敛验证。"""
+"""运行Q2条件接收候选域、鲁棒第二点和交会角基线。"""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 import platform
 import sys
 import time
@@ -19,8 +20,11 @@ import numpy as np
 from q2_angle_baseline import run_angle_baseline
 from q2_robust_second_measurement_optimizer import (
     Q2Config,
+    build_candidate_region_samples,
     build_omega1,
     build_p2_outer_polygon,
+    candidate_metrics,
+    classify_candidates,
     evaluate_candidate,
     farthest_point_scenarios,
     old_two_wedge_status,
@@ -28,7 +32,7 @@ from q2_robust_second_measurement_optimizer import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-OUTPUT = ROOT / "results" / "Q2" / "experiments" / "round2"
+OUTPUT = ROOT / "results" / "Q2" / "experiments" / "round3"
 ASSUMPTIONS = ROOT / "model_assumptions.md"
 plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "DejaVu Sans"]
 plt.rcParams["axes.unicode_minus"] = False
@@ -47,95 +51,155 @@ def _write_csv(path: Path, rows: list[dict]) -> None:
         writer.writerows(rows)
 
 
-def _plot_candidate_region(config, omega, feasible, main, baseline, path: Path) -> None:
-    fig, ax = plt.subplots(figsize=(8.2, 5.4), constrained_layout=True)
+def _local_coordinates(points: np.ndarray, config: Q2Config) -> tuple[np.ndarray, np.ndarray]:
+    angle = math.radians(config.first_bearing_deg)
+    forward = np.array([math.cos(angle), math.sin(angle)])
+    lateral = np.array([-math.sin(angle), math.cos(angle)])
+    relative = points - np.array([config.s1_x, config.s1_y])
+    return relative @ forward, relative @ lateral
+
+
+def _region_rows(region: dict[str, np.ndarray], config: Q2Config) -> list[dict]:
+    points = region["all"]
+    forward, lateral = _local_coordinates(points, config)
+    rows = []
+    for index, point in enumerate(points):
+        if not region["signal_mask"][index] and not region["bearing_mask"][index]:
+            continue
+        rows.append(
+            {
+                "x_m": float(point[0]),
+                "y_m": float(point[1]),
+                "forward_from_s1_m": float(forward[index]),
+                "lateral_from_s1_m": float(lateral[index]),
+                "in_signal_region": bool(region["signal_mask"][index]),
+                "in_bearing_region": bool(region["bearing_mask"][index]),
+                "sampled_signal_margin_m": float(region["signal_margin_m"][index]),
+                "sampled_min_target_distance_m": float(region["minimum_distance_m"][index]),
+                "sampled_max_target_distance_m": float(region["maximum_distance_m"][index]),
+            }
+        )
+    return rows
+
+
+def _region_summary(region: dict[str, np.ndarray], config: Q2Config) -> dict:
+    signal = region["signal"]
+    bearing = region["bearing"]
+    step = config.candidate_region_step_m
+    signal_forward, signal_lateral = _local_coordinates(signal, config)
+    bearing_forward, bearing_lateral = _local_coordinates(bearing, config)
+
+    def bounds(points: np.ndarray, forward: np.ndarray, lateral: np.ndarray) -> dict | None:
+        if len(points) == 0:
+            return None
+        return {
+            "x_min_m": float(points[:, 0].min()),
+            "x_max_m": float(points[:, 0].max()),
+            "y_min_m": float(points[:, 1].min()),
+            "y_max_m": float(points[:, 1].max()),
+            "forward_min_m": float(forward.min()),
+            "forward_max_m": float(forward.max()),
+            "lateral_min_m": float(lateral.min()),
+            "lateral_max_m": float(lateral.max()),
+        }
+
+    return {
+        "signal_region_definition": "for all (G,R) consistent with first success, distance(S2,G) <= R; equivalently distance(S2,G) <= max(1000,distance(S1,G)) for all G",
+        "bearing_region_definition": "signal region plus distance(S2,G) > 5 m for every G",
+        "representation": "uniform-grid approximation over the target scenario pool",
+        "grid_step_m": step,
+        "signal_region_nonempty": bool(len(signal)),
+        "bearing_region_nonempty": bool(len(bearing)),
+        "signal_grid_point_count": int(len(signal)),
+        "bearing_grid_point_count": int(len(bearing)),
+        "signal_approx_area_m2": float(len(signal) * step * step),
+        "bearing_approx_area_m2": float(len(bearing) * step * step),
+        "signal_bounds": bounds(signal, signal_forward, signal_lateral),
+        "bearing_bounds": bounds(bearing, bearing_forward, bearing_lateral),
+        "scope_note": "counts, areas and bounds approximate the continuous regions and depend on grid/scenario resolution",
+    }
+
+
+def _plot_regions(config, omega, region, main, baseline, path: Path) -> None:
+    fig, axes = plt.subplots(1, 2, figsize=(13.0, 5.5), constrained_layout=True)
     polygon = np.vstack((omega.outer_polygon, omega.outer_polygon[0]))
-    ax.fill(polygon[:, 0], polygon[:, 1], color="#80b1d3", alpha=0.22, label=r"$\Omega_1$ 外包络")
-    ax.scatter(omega.scenario_pool[:, 0], omega.scenario_pool[:, 1], s=4, color="#377eb8", alpha=0.25, label="目标位置场景")
-    ax.scatter(feasible[:, 0], feasible[:, 1], s=30, facecolors="none", edgecolors="#4daf4a", label="严格候选点")
-    ax.scatter(main["x"], main["y"], s=120, marker="*", color="#e41a1c", label="M2-RR")
-    ax.scatter(baseline["x"], baseline["y"], s=70, marker="D", color="#984ea3", label="M2-ANGLE")
-    ax.scatter(config.s1_x, config.s1_y, s=70, marker="^", color="#ff7f00", label=r"第一检测点 $S_1$")
-    ax.set_xlabel("x（m，向东）")
-    ax.set_ylabel("y（m，向北）")
-    ax.set_aspect("equal", adjustable="box")
-    ax.grid(alpha=0.25)
-    ax.legend(loc="best")
+    for ax in axes:
+        ax.fill(polygon[:, 0], polygon[:, 1], color="#80b1d3", alpha=0.22, label=r"$\Omega_1$ 外包络")
+        ax.scatter(region["signal"][:, 0], region["signal"][:, 1], s=13, color="#a1d99b", label=r"响应候选域 $\mathcal{C}_{sig}$")
+        ax.scatter(region["bearing"][:, 0], region["bearing"][:, 1], s=8, color="#238b45", label=r"示向候选域 $\mathcal{C}_{bearing}$")
+        ax.scatter(main["x"], main["y"], s=115, marker="*", color="#e41a1c", label="M2-RR")
+        ax.scatter(baseline["x"], baseline["y"], s=65, marker="D", color="#984ea3", label="M2-ANGLE")
+        ax.scatter(config.s1_x, config.s1_y, s=65, marker="^", color="#ff7f00", label=r"第一检测点 $S_1$")
+        ax.set_xlabel("x（m，向东）")
+        ax.set_ylabel("y（m，向北）")
+        ax.set_aspect("equal", adjustable="box")
+        ax.grid(alpha=0.25)
+    axes[0].legend(loc="best", fontsize=9)
+    combined = np.vstack((region["signal"], region["bearing"]))
+    padding = 100.0
+    axes[1].set_xlim(float(combined[:, 0].min() - padding), float(combined[:, 0].max() + padding))
+    axes[1].set_ylim(float(combined[:, 1].min() - padding), float(combined[:, 1].max() + padding))
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=300)
     plt.close(fig)
 
 
-def _plot_objective_map(config, omega, feasible, main, path: Path) -> None:
+def _plot_objective(config, omega, feasible, main, path: Path) -> None:
     scenarios = farthest_point_scenarios(omega.scenario_pool, config.scenario_count)
     errors = np.linspace(-config.bearing_error_deg, config.bearing_error_deg, config.error_scenario_count)
     values = [
-        evaluate_candidate(candidate, omega.outer_polygon, scenarios, errors, config).radius_m
-        for candidate in feasible
+        evaluate_candidate(point, omega.outer_polygon, scenarios, errors, config).radius_m
+        for point in feasible
     ]
-    fig, ax = plt.subplots(figsize=(5.2, 7.4), constrained_layout=True)
-    scatter = ax.scatter(feasible[:, 0], feasible[:, 1], c=values, s=70, cmap="viridis")
+    fig, ax = plt.subplots(figsize=(5.4, 7.4), constrained_layout=True)
+    scatter = ax.scatter(feasible[:, 0], feasible[:, 1], c=values, s=55, cmap="viridis")
     ax.scatter(main["x"], main["y"], s=120, marker="*", color="#e41a1c", label="M2-RR")
     ax.set_xlabel("x（m，向东）")
     ax.set_ylabel("y（m，向北）")
     ax.set_aspect("equal", adjustable="box")
     ax.grid(alpha=0.25)
     ax.legend(loc="best")
-    colorbar = fig.colorbar(scatter, ax=ax)
-    colorbar.set_label("离散最坏最小包围圆半径（m）")
+    fig.colorbar(scatter, ax=ax).set_label("离散最坏最小包围圆半径（m）")
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=300)
     plt.close(fig)
 
 
-def _boundary_validation(config: Q2Config, main_result, main_evidence) -> list[dict]:
-    omega = build_omega1(config)
-    old_status = old_two_wedge_status(config, (-500.0, 0.0), 0.0)
-    new_polygon = build_p2_outer_polygon(omega.outer_polygon, np.array([-500.0, 0.0]), 0.0, config.bearing_error_deg)
-    cross_zero = build_omega1(replace(config, first_bearing_deg=359.8))
-    empty_result, empty_evidence, _, _ = optimize(
-        replace(config, guaranteed_radius_m=100.0, candidate_step_m=100.0, refinement_step_m=50.0, scenario_count=5, error_scenario_count=3),
-        method="M2-RR",
+def _boundary_checks(config: Q2Config, omega, main, evidence) -> list[dict]:
+    test_point = np.array([[500.0, 800.0]])
+    test_class = classify_candidates(test_point, omega.scenario_pool, config)
+    _, _, old_max, _ = candidate_metrics(test_point, omega.scenario_pool, config)
+    old_fixed_1000 = bool(old_max[0] <= config.guaranteed_radius_m)
+    same_class = classify_candidates(
+        np.array([[config.s1_x, config.s1_y]]), omega.scenario_pool, config
     )
-    rows = [
-        {
-            "case": "canonical_p2_replaces_two_wedges",
-            "criterion": "old model unbounded and canonical P2 bounded",
-            "observed": f"old={old_status}; new_vertices={len(new_polygon)}",
-            "passed": old_status == "UNBOUNDED" and len(new_polygon) >= 3 and np.isfinite(new_polygon).all(),
-        },
-        {
-            "case": "cross_zero_first_bearing",
-            "criterion": "Omega1 remains nonempty at 359.8 degrees",
-            "observed": f"outer_vertices={len(cross_zero.outer_polygon)}",
-            "passed": len(cross_zero.outer_polygon) >= 3,
-        },
-        {
-            "case": "strict_candidate_reception",
-            "criterion": "max distance <= 1000 m",
-            "observed": f"max={main_result.certified_max_distance_m:.9f}",
-            "passed": main_result.certified_max_distance_m <= config.guaranteed_radius_m + 1e-8,
-        },
-        {
-            "case": "strict_candidate_not_near",
-            "criterion": "minimum distance > 5 m",
-            "observed": f"min={main_result.certified_min_distance_m:.9f}",
-            "passed": main_result.certified_min_distance_m > config.near_radius_m,
-        },
-        {
-            "case": "bearing_error_endpoints",
-            "criterion": "both -delta and +delta included",
-            "observed": str(main_evidence["error_endpoints_included"]),
-            "passed": bool(main_evidence["error_endpoints_included"]),
-        },
-        {
-            "case": "empty_strict_candidate_set",
-            "criterion": "100 m guarantee triggers fallback evidence",
-            "observed": f"result_is_none={empty_result is None}; trigger={empty_evidence['fallback_triggered']}",
-            "passed": empty_result is None and bool(empty_evidence["fallback_triggered"]),
-        },
+    near_target = np.array([750.0, 0.0])
+    near_eval = evaluate_candidate(
+        near_target,
+        omega.outer_polygon,
+        np.array([near_target, [1200.0, 0.0]]),
+        [-config.bearing_error_deg, config.bearing_error_deg],
+        config,
+    )
+    old_status = old_two_wedge_status(config, (-500.0, 0.0), 0.0)
+    new_polygon = build_p2_outer_polygon(
+        omega.outer_polygon,
+        np.array([-500.0, 0.0]),
+        0.0,
+        config.bearing_error_deg,
+        config.maximum_radius_m,
+        config.disk_sides,
+    )
+    cross_zero = build_omega1(replace(config, first_bearing_deg=359.8))
+    return [
+        {"case": "conditional_radius_recovers_valid_point", "observed": f"new={len(test_class['signal']) == 1}; old={old_fixed_1000}", "passed": len(test_class["signal"]) == 1 and not old_fixed_1000},
+        {"case": "near_is_success_branch", "observed": f"near_scenarios={near_eval.near_scenario_count}", "passed": near_eval.near_scenario_count == 1},
+        {"case": "same_location_excluded", "observed": f"signal_count={len(same_class['signal'])}", "passed": len(same_class["signal"]) == 0},
+        {"case": "canonical_p2_bounded", "observed": f"old={old_status}; new_vertices={len(new_polygon)}", "passed": old_status == "UNBOUNDED" and len(new_polygon) >= 3},
+        {"case": "cross_zero_first_bearing", "observed": f"outer_vertices={len(cross_zero.outer_polygon)}", "passed": len(cross_zero.outer_polygon) >= 3},
+        {"case": "error_endpoints_included", "observed": str(evidence["error_endpoints_included"]), "passed": bool(evidence["error_endpoints_included"])},
+        {"case": "main_signal_margin", "observed": f"margin={main.sampled_signal_margin_m:.9f}", "passed": main.sampled_signal_margin_m >= -config.tie_tolerance_m},
     ]
-    return rows
 
 
 def run(base: Q2Config | None = None) -> dict:
@@ -143,268 +207,182 @@ def run(base: Q2Config | None = None) -> dict:
     base = base or Q2Config()
     assumption_hash = hashlib.sha256(ASSUMPTIONS.read_bytes()).hexdigest()
     levels = [
-        ("coarse", replace(base, disk_sides=48, scenario_pool_count=400, candidate_step_m=150.0, refinement_step_m=50.0, scenario_count=15, error_scenario_count=3)),
-        ("medium", replace(base, disk_sides=96, scenario_pool_count=625, candidate_step_m=100.0, refinement_step_m=25.0, scenario_count=25, error_scenario_count=5)),
-        ("fine", replace(base, disk_sides=160, scenario_pool_count=900, candidate_step_m=100.0, refinement_step_m=25.0, scenario_count=41, error_scenario_count=7)),
+        ("coarse", replace(base, disk_sides=48, scenario_pool_count=400, candidate_step_m=150.0, candidate_region_step_m=100.0, refinement_step_m=50.0, scenario_count=15, error_scenario_count=3)),
+        ("medium", replace(base, disk_sides=96, scenario_pool_count=625, candidate_step_m=100.0, candidate_region_step_m=75.0, refinement_step_m=25.0, scenario_count=25, error_scenario_count=5)),
+        ("fine", replace(base, disk_sides=160, scenario_pool_count=900, candidate_step_m=100.0, candidate_region_step_m=50.0, refinement_step_m=25.0, scenario_count=41, error_scenario_count=7)),
     ]
-    sensitivity_rows = []
+    sensitivity = []
     canonical = canonical_evidence = canonical_omega = canonical_feasible = None
     for level, config in levels:
-        result, evidence, omega, feasible = optimize(config, method="M2-RR")
-        row = {
-            "level": level,
-            "disk_sides": config.disk_sides,
-            "scenario_count": config.scenario_count,
-            "error_scenario_count": config.error_scenario_count,
-            "candidate_step_m": config.candidate_step_m,
-            "circle_outer_gap_m": evidence["circle_outer_gap_m"],
-            "feasible_count": evidence["coarse_feasible_count"],
-            "status": "OK" if result else "EMPTY_CANDIDATE_SET",
-            "x_m": "" if result is None else result.x,
-            "y_m": "" if result is None else result.y,
-            "worst_radius_m": "" if result is None else result.discretized_worst_radius_m,
-            "worst_diameter_m": "" if result is None else result.worst_diameter_m,
-        }
-        sensitivity_rows.append(row)
+        result, evidence, omega, feasible = optimize(config, "M2-RR")
+        sensitivity.append(
+            {
+                "level": level,
+                "disk_sides": config.disk_sides,
+                "target_scenarios": config.scenario_count,
+                "error_scenarios": config.error_scenario_count,
+                "candidate_step_m": config.candidate_step_m,
+                "signal_candidate_count": evidence["coarse_signal_candidate_count"],
+                "bearing_candidate_count": evidence["coarse_bearing_candidate_count"],
+                "x_m": "" if result is None else result.x,
+                "y_m": "" if result is None else result.y,
+                "worst_radius_m": "" if result is None else result.discretized_worst_radius_m,
+            }
+        )
         if level == "fine":
             canonical, canonical_evidence, canonical_omega, canonical_feasible = result, evidence, omega, feasible
     if canonical is None:
-        raise RuntimeError("细网格下严格候选域为空；请查看候选域违约证据")
-
+        raise RuntimeError("条件接收候选域为空")
     fine_config = levels[-1][1]
     baseline, baseline_evidence, _, _ = run_angle_baseline(fine_config)
     if baseline is None:
-        raise RuntimeError("主方法可行但基线未找到候选点")
+        raise RuntimeError("基线没有找到条件接收候选点")
 
-    comparison_rows = []
+    region = build_candidate_region_samples(canonical_omega, fine_config)
+    region_summary = _region_summary(region, fine_config)
+    region_rows = _region_rows(region, fine_config)
+    checks = _boundary_checks(fine_config, canonical_omega, canonical, canonical_evidence)
+    all_checks = all(bool(row["passed"]) for row in checks)
+    comparison = []
     for result in (canonical, baseline):
-        comparison_rows.append(
+        forward, lateral = _local_coordinates(np.array([[result.x, result.y]]), fine_config)
+        comparison.append(
             {
                 "method": result.method,
                 "x_m": result.x,
                 "y_m": result.y,
+                "forward_from_s1_m": float(forward[0]),
+                "lateral_from_s1_m": float(lateral[0]),
                 "movement_m": result.movement_m,
                 "discretized_worst_radius_m": result.discretized_worst_radius_m,
                 "worst_diameter_m": result.worst_diameter_m,
-                "min_angle_sine": result.min_angle_sine,
-                "certified_min_distance_m": result.certified_min_distance_m,
-                "certified_max_distance_m": result.certified_max_distance_m,
+                "sampled_signal_margin_m": result.sampled_signal_margin_m,
+                "near_scenario_count": result.near_scenario_count,
+                "bearing_scenario_count": result.bearing_scenario_count,
                 "within_20m": result.meets_20m_on_discretization,
             }
         )
-    boundary_rows = _boundary_validation(fine_config, canonical, canonical_evidence)
-    boundary_passed = all(bool(row["passed"]) for row in boundary_rows)
-    candidate_region = {
-        "status": "NONEMPTY",
-        "definition": "for every G in Omega1: distance(S2,G) <= 1000 m and distance(S2,G) > 5 m",
-        "representation": "fine global grid plus long-axis-normal seeds, certified against the Omega1 outer polygon",
-        "fine_candidate_count": int(len(canonical_feasible)),
-        "sampled_x_min_m": float(canonical_feasible[:, 0].min()),
-        "sampled_x_max_m": float(canonical_feasible[:, 0].max()),
-        "sampled_y_min_m": float(canonical_feasible[:, 1].min()),
-        "sampled_y_max_m": float(canonical_feasible[:, 1].max()),
-        "circle_outer_gap_m": float(canonical_omega.circle_outer_gap_m),
-        "optimal_point_is_certified_feasible": bool(
-            canonical.certified_max_distance_m <= fine_config.guaranteed_radius_m + 1e-8
-            and canonical.certified_min_distance_m > fine_config.near_radius_m
-        ),
-        "optimal_point_certified_max_distance_m": canonical.certified_max_distance_m,
-        "optimal_point_certified_min_distance_m": canonical.certified_min_distance_m,
-        "scope_note": "coordinate ranges describe searched feasible points, not the exact boundary of the continuous candidate region",
-    }
 
     table_dir = OUTPUT / "tables"
     figure_dir = OUTPUT / "figures"
-    metrics_path = OUTPUT / "metrics" / "q2_metrics.json"
-    comparison_path = table_dir / "candidate_comparison.csv"
-    sensitivity_path = table_dir / "sensitivity.csv"
-    boundary_path = table_dir / "boundary_validation.csv"
-    candidate_figure = figure_dir / "q2_candidate_region.png"
-    objective_figure = figure_dir / "q2_objective_map.png"
-    _write_csv(comparison_path, comparison_rows)
-    _write_csv(sensitivity_path, sensitivity_rows)
-    _write_csv(boundary_path, boundary_rows)
-    _plot_candidate_region(fine_config, canonical_omega, canonical_feasible, canonical.to_dict(), baseline.to_dict(), candidate_figure)
-    _plot_objective_map(fine_config, canonical_omega, canonical_feasible, canonical.to_dict(), objective_figure)
+    paths = {
+        "candidate_region": table_dir / "candidate_region.csv",
+        "comparison": table_dir / "candidate_comparison.csv",
+        "sensitivity": table_dir / "sensitivity.csv",
+        "boundary": table_dir / "boundary_validation.csv",
+        "candidate_figure": figure_dir / "q2_candidate_region.png",
+        "objective_figure": figure_dir / "q2_objective_map.png",
+        "metrics": OUTPUT / "metrics" / "q2_metrics.json",
+        "summary": OUTPUT / "run_summary.json",
+    }
+    _write_csv(paths["candidate_region"], region_rows)
+    _write_csv(paths["comparison"], comparison)
+    _write_csv(paths["sensitivity"], sensitivity)
+    _write_csv(paths["boundary"], checks)
+    _plot_regions(fine_config, canonical_omega, region, canonical.to_dict(), baseline.to_dict(), paths["candidate_figure"])
+    _plot_objective(fine_config, canonical_omega, canonical_feasible, canonical.to_dict(), paths["objective_figure"])
 
     metrics = {
         "schema_version": 1,
         "question_id": "Q2",
-        "decision_id": "q2_robust_radius_method",
+        "decision_id": "q2_conditional_reception_2026-09-11",
         "model_assumptions_sha256": assumption_hash,
         "instance_type": "synthetic_demonstration_not_official_problem_data",
-        "canonical_definition": "P2 = Omega1 intersection W2",
-        "config": asdict(fine_config),
+        "first_success_condition": "R >= distance(S1,G), 1000 <= R <= 1500",
+        "candidate_regions": region_summary,
         "main": canonical.to_dict(),
         "baseline": baseline.to_dict(),
-        "main_candidate_evidence": canonical_evidence,
-        "baseline_candidate_evidence": baseline_evidence,
-        "candidate_region": candidate_region,
-        "boundary_cases_passed": sum(bool(row["passed"]) for row in boundary_rows),
-        "boundary_cases": len(boundary_rows),
-        "sensitivity_levels": sensitivity_rows,
-        "claim_scope": "candidate reception is certified by an outer polygon; target/error maximization is a converged finite discretization, not an analytic global optimum",
+        "main_evidence": canonical_evidence,
+        "baseline_evidence": baseline_evidence,
+        "boundary_cases_passed": sum(bool(row["passed"]) for row in checks),
+        "boundary_cases": len(checks),
+        "sensitivity": sensitivity,
+        "claim_scope": "candidate regions and worst-case objective use deterministic finite discretization; they are not analytic exact boundaries or a proof of the continuous global optimum",
     }
-    _write_json(metrics_path, metrics)
+    _write_json(paths["metrics"], metrics)
     elapsed = time.perf_counter() - started
-    success = boundary_passed and np.isfinite(canonical.discretized_worst_radius_m)
-    medium_row = sensitivity_rows[-2]
-    fine_row = sensitivity_rows[-1]
-    convergence = {
-        "medium_to_fine_point_shift_m": float(
-            np.hypot(fine_row["x_m"] - medium_row["x_m"], fine_row["y_m"] - medium_row["y_m"])
-        ),
-        "medium_to_fine_radius_change_m": float(
-            abs(fine_row["worst_radius_m"] - medium_row["worst_radius_m"])
-        ),
-        "circle_outer_gap_reduction_m": float(
-            medium_row["circle_outer_gap_m"] - fine_row["circle_outer_gap_m"]
-        ),
-    }
     summary = {
         "schema_version": 1,
         "question": "Q2",
-        "round": "round2",
+        "round": "round3",
         "implementation_target": "python",
         "random_seed": fine_config.seed,
-        "approved_decision_id": "q2_robust_radius_method",
+        "config": asdict(fine_config),
+        "approved_decision_id": "q2_conditional_reception_2026-09-11",
+        "status": "success" if all_checks else "failed",
+        "execution_time_seconds": elapsed,
         "model_assumptions_file": "model_assumptions.md",
         "model_assumptions_sha256": assumption_hash,
-        "status": "success" if success else "failed",
-        "execution_time_seconds": elapsed,
-        "main_method": "M2-RR",
-        "baseline_method": "M2-ANGLE",
-        "methods": [
-            {
-                "method_id": "M2-RR",
-                "role": "main",
-                "script": "code/Q2/q2_robust_second_measurement_optimizer.py",
-                "status": "success" if success else "failed",
-                "metrics_summary": canonical.to_dict(),
-                "warnings": ["真实位置与测向误差的最坏情形采用有限场景加密。"],
-                "errors": [],
-            },
-            {
-                "method_id": "M2-ANGLE",
-                "role": "usable_baseline",
-                "script": "code/Q2/q2_angle_baseline.py",
-                "status": "success",
-                "metrics_summary": baseline.to_dict(),
-                "warnings": ["交会角仅为定位半径的代理指标。"],
-                "errors": [],
-            },
-        ],
-        "fallback_trigger": {
-            "fallback_id": "M2-SLACK",
-            "condition": "严格候选区域为空",
-            "observed": False,
-            "activated": False,
-            "evidence": {"fine_coarse_feasible_count": canonical_evidence["coarse_feasible_count"]},
-        },
+        "candidate_regions": region_summary,
         "main_result": canonical.to_dict(),
         "baseline_result": baseline.to_dict(),
-        "candidate_region": candidate_region,
+        "methods": [
+            {"method_id": "M2-RR", "role": "main", "script": "code/Q2/q2_robust_second_measurement_optimizer.py", "status": "success", "metrics_summary": canonical.to_dict(), "warnings": ["有限场景近似"], "errors": []},
+            {"method_id": "M2-ANGLE", "role": "usable_baseline", "script": "code/Q2/q2_angle_baseline.py", "status": "success", "metrics_summary": baseline.to_dict(), "warnings": ["交会角是代理指标"], "errors": []},
+        ],
         "comparison": {
             "radius_improvement_m": baseline.discretized_worst_radius_m - canonical.discretized_worst_radius_m,
             "main_within_20m": canonical.meets_20m_on_discretization,
-            "boundary_validation_passed": boundary_passed,
-            "convergence": convergence,
+            "boundary_validation_passed": all_checks,
         },
-        "output_degeneracy": {
-            "strict_candidate_set_empty": False,
-            "main_radius_finite": bool(np.isfinite(canonical.discretized_worst_radius_m)),
-            "baseline_radius_finite": bool(np.isfinite(baseline.discretized_worst_radius_m)),
-        },
-        "outputs": {
-            "metrics": metrics_path.relative_to(ROOT).as_posix(),
-            "comparison": comparison_path.relative_to(ROOT).as_posix(),
-            "sensitivity": sensitivity_path.relative_to(ROOT).as_posix(),
-            "boundary_validation": boundary_path.relative_to(ROOT).as_posix(),
-            "candidate_figure": candidate_figure.relative_to(ROOT).as_posix(),
-            "objective_figure": objective_figure.relative_to(ROOT).as_posix(),
-        },
-        "environment": {
-            "python": sys.version.split()[0],
-            "platform": platform.platform(),
-            "numpy": np.__version__,
-            "matplotlib": matplotlib.__version__,
-        },
+        "fallback_trigger": {"fallback_id": "M2-SLACK", "condition": "conditional signal region empty", "observed": False, "activated": False, "evidence": {"signal_candidate_count": canonical_evidence["coarse_signal_candidate_count"]}},
+        "outputs": {key: value.relative_to(ROOT).as_posix() for key, value in paths.items() if key != "summary"},
+        "environment": {"python": sys.version.split()[0], "platform": platform.platform(), "numpy": np.__version__, "matplotlib": matplotlib.__version__},
     }
-    _write_json(OUTPUT / "run_summary.json", summary)
+    _write_json(paths["summary"], summary)
     return summary
 
 
 def print_chinese_summary(summary: dict) -> None:
+    region = summary["candidate_regions"]
     main = summary["main_result"]
     baseline = summary["baseline_result"]
-    region = summary["candidate_region"]
+    main_forward, main_lateral = _local_coordinates(
+        np.array([[main["x"], main["y"]]]), Q2Config(**summary["config"])
+    )
     print("========== Q2 鲁棒第二检测点运行结果 ==========")
     print(f"运行状态：{'成功' if summary['status'] == 'success' else '失败'}")
-    print("定位集合：P2 = Omega1 与 W2 的交集（旧定义已作废）")
-    print("算例性质：合成演示，不是题目官方观测数据")
+    print("第一次成功检测条件：R≥距离(S1,G)，且1000≤R≤1500 m")
+    print("响应候选域：对每个可能目标，第二距离≤max(1000,第一距离)")
+    print("示向候选域：响应候选域中再要求第二距离始终>5 m")
     print()
-    print("严格候选区域 C：")
-    print(f"  状态：{'非空' if region['status'] == 'NONEMPTY' else '为空'}")
-    print("  约束：对所有 G∈Ω1，第二点到G的距离不超过1000 m且严格大于5 m")
-    print(f"  细层搜索发现候选点：{region['fine_candidate_count']} 个")
-    print(
-        f"  搜索候选点横坐标范围：[{region['sampled_x_min_m']:.3f}, "
-        f"{region['sampled_x_max_m']:.3f}] m"
-    )
-    print(
-        f"  搜索候选点纵坐标范围：[{region['sampled_y_min_m']:.3f}, "
-        f"{region['sampled_y_max_m']:.3f}] m"
-    )
-    print(f"  圆域外包络误差上限：{region['circle_outer_gap_m']:.6f} m")
-    print(
-        "  最优点是否满足候选区域约束："
-        f"{'是' if region['optimal_point_is_certified_feasible'] else '否'}"
-    )
-    print(
-        f"  最优点对Ω1的最大距离："
-        f"{region['optimal_point_certified_max_distance_m']:.6f} m"
-    )
-    print(
-        f"  最优点到Ω1的最小距离："
-        f"{region['optimal_point_certified_min_distance_m']:.6f} m"
-    )
-    print("  注：上述坐标范围是搜索到的可行点范围，不是连续候选域的精确边界。")
+    print("候选区域（合成演示的网格近似）：")
+    print(f"  响应候选域是否为空：{'否' if region['signal_region_nonempty'] else '是'}")
+    print(f"  示向候选域是否为空：{'否' if region['bearing_region_nonempty'] else '是'}")
+    print(f"  网格步长：{region['grid_step_m']:.3f} m")
+    print(f"  响应候选点：{region['signal_grid_point_count']} 个，近似面积：{region['signal_approx_area_m2']:.3f} 平方米")
+    print(f"  示向候选点：{region['bearing_grid_point_count']} 个，近似面积：{region['bearing_approx_area_m2']:.3f} 平方米")
+    print(f"  完整候选点文件：{OUTPUT / 'tables' / 'candidate_region.csv'}")
+    print("  注：面积和边界依赖网格分辨率，不是解析精确值。")
     print()
     print("主方法 M2-RR：")
     print(f"  第二检测点：({main['x']:.3f}, {main['y']:.3f}) m")
-    print(f"  移动距离：{main['movement_m']:.3f} m")
+    print(f"  相对首测方向：前向{main_forward[0]:.3f} m，侧向{main_lateral[0]:.3f} m")
     print(f"  离散最坏包围圆半径：{main['discretized_worst_radius_m']:.6f} m")
-    print(f"  最坏区域直径：{main['worst_diameter_m']:.6f} m")
+    print(f"  条件接收最小余量：{main['sampled_signal_margin_m']:.6f} m")
     print(f"  是否达到20 m：{'是' if main['meets_20m_on_discretization'] else '否'}")
     print()
-    print("交会角基线 M2-ANGLE：")
-    print(f"  第二检测点：({baseline['x']:.3f}, {baseline['y']:.3f}) m")
-    print(f"  离散最坏包围圆半径：{baseline['discretized_worst_radius_m']:.6f} m")
+    print(f"交会角基线半径：{baseline['discretized_worst_radius_m']:.6f} m")
     print(f"主方法相对基线改善：{summary['comparison']['radius_improvement_m']:.6f} m")
     print(f"边界验证：{'全部通过' if summary['comparison']['boundary_validation_passed'] else '存在失败'}")
-    print("说明：连续最坏情形采用有限场景加密，不能表述为解析全局最优。")
-    print(f"完整记录：{OUTPUT / 'run_summary.json'}")
+    print("说明：当前数值为合成演示，题目未给具体S1和首测示向度。")
     print("================================================")
 
 
 if __name__ == "__main__":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--s1-x", type=float, default=0.0)
     parser.add_argument("--s1-y", type=float, default=0.0)
     parser.add_argument("--first-bearing-deg", type=float, default=0.0)
     parser.add_argument("--arena-x", type=float, default=0.0)
     parser.add_argument("--arena-y", type=float, default=0.0)
-    parser.add_argument("--json", action="store_true", help="输出机器可读JSON")
-    arguments = parser.parse_args()
-    base = Q2Config(
-        s1_x=arguments.s1_x,
-        s1_y=arguments.s1_y,
-        first_bearing_deg=arguments.first_bearing_deg,
-        arena_x=arguments.arena_x,
-        arena_y=arguments.arena_y,
-    )
-    result = run(base)
-    if arguments.json:
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args()
+    config = Q2Config(s1_x=args.s1_x, s1_y=args.s1_y, first_bearing_deg=args.first_bearing_deg, arena_x=args.arena_x, arena_y=args.arena_y)
+    result = run(config)
+    if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
         print_chinese_summary(result)

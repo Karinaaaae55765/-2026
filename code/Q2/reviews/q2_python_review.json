@@ -11,14 +11,14 @@
     "code/Q2/q2_angle_baseline.py",
     "code/Q2/run_q2_experiment.py",
     "tests/Q2/test_q2_optimizer.py",
-    "results/Q2/experiments/round2/run_summary.json"
+    "results/Q2/experiments/round3/run_summary.json"
   ],
-  "decision_id": "q2_robust_radius_method",
+  "decision_id": "q2_conditional_reception_2026-09-11",
   "checks": {
     "syntax": {
       "status": "PASS",
       "evidence": [
-        "D:/python/python.exe -m compileall -q code/Q2 tests/Q2返回0",
+        "D:/python/python.exe -m compileall -q code/Q2 tests/Q2 返回0",
         "Q2单元测试10项全部通过"
       ]
     },
@@ -30,56 +30,63 @@
         "默认实例明确标记为合成演示而非官方数据"
       ]
     },
+    "conditional_reception": {
+      "status": "PASS",
+      "evidence": [
+        "候选约束逐目标使用max(1000,distance(S1,G))，不再固定为1000m",
+        "边界案例(500,800)被条件规则保留，同时会被旧固定1000m规则错误排除",
+        "响应候选域与保证再次示向的子域分别输出"
+      ]
+    },
     "method_alignment": {
       "status": "PASS",
       "evidence": [
-        "每个第二次定位区域均由Omega1外包络与W2做半平面裁剪构造",
-        "回归案例中旧W1与W2交集返回UNBOUNDED，而规范P2得到3顶点有界多边形",
-        "M2-RR为主方法，M2-ANGLE为唯一基线，M2-SLACK未激活"
+        "非near场景均显式构造P2=Omega1∩W2并保留B(S2,1500)上界",
+        "旧W1∩W2回归案例为UNBOUNDED，而规范P2得到有界多边形",
+        "M2-RR和M2-ANGLE使用同一条件响应候选域"
       ]
     },
-    "candidate_feasibility": {
+    "candidate_regions": {
       "status": "PASS",
       "evidence": [
-        "主方法点的认证最大距离为999.062060134m，不超过1000m",
-        "主方法点到Omega1外包络的最小距离为510.085494485m，严格大于5m",
-        "100m保证半径案例正确报告严格候选域为空并记录后备触发证据"
+        "50m网格下响应候选点488个、纯示向候选点484个",
+        "同址S2=S1被排除；near场景按直接成功、零定位损失处理",
+        "candidate_region.csv逐点保存坐标、局部坐标、两类区域标志、条件余量和距离范围"
       ]
     },
     "boundary_cases": {
       "status": "PASS",
       "evidence": [
-        "boundary_validation.csv中6/6项通过",
-        "跨0度、正负误差端点、圆域截断、near约束、接收约束和空候选域均有覆盖"
+        "boundary_validation.csv中7/7项通过",
+        "覆盖条件半径、near成功、同址排除、新旧P2、跨0度、误差端点和主点接收余量"
       ]
     },
     "reproducibility": {
       "status": "PASS",
       "evidence": [
-        "固定随机种子2026",
-        "连续两次运行q2_metrics.json的SHA-256均为DCB9E26A0787DAD15C28AF3C9D85B1A43F810A8F97808F9F88422E6EF2F71AA4",
-        "中、细两档最优点均为(850,-525)，半径变化0.165054936m"
+        "固定随机种子2026，连续两次完整运行核心结果一致",
+        "两次均得到响应/示向候选点488/484、主点(850,-525)和最坏半径55.404509307m",
+        "最终q2_metrics.json的SHA-256为A4EA3DC63993D1F12ADA7FF0B20576CCB6F07748AE618029D334BE3A6CBC9589"
       ]
     },
     "output_contract": {
       "status": "PASS",
       "evidence": [
-        "round2运行摘要、指标、主基线比较、灵敏度表、边界表和两张中文图均存在",
-        "默认终端输出中文摘要，--json保留机器接口",
-        "中文终端明确报告严格候选区域非空、38个细层候选点、坐标范围及最优点可行性",
-        "主方法半径55.404509307m，基线58.289979619m，二者使用同一评价指标"
+        "round3摘要、指标、完整候选点表、比较表、灵敏度、边界表和两张无标题中文图均存在",
+        "Windows终端使用UTF-8中文摘要，--json保留机器接口",
+        "主方法半径55.404509307m，基线60.892431626m，改善5.487922319m"
       ]
     },
     "numerical_scope": {
       "status": "PASS",
       "evidence": [
-        "圆外包络误差由中档0.964258819m降至细档0.347034026m",
-        "候选接收约束使用Omega1外包络，因此具有保守保证",
-        "结果明确标注真实位置与误差最大化为有限场景近似，未声称解析全局最优"
+        "中、细网格最优点均为(850,-525)，最坏半径差0.165054936m",
+        "候选区域与最坏情形均明确标注为确定性有限离散近似",
+        "未把合成坐标、网格面积或有限场景最优误写为题目通用解析结论"
       ]
     }
   },
   "findings": [],
   "verdict": "PASSED",
-  "reviewed_at": "2026-09-11T17:34:00+08:00"
+  "reviewed_at": "2026-09-11T18:12:06+08:00"
 }

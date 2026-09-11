@@ -1,0 +1,4 @@
+﻿level,disk_sides,target_scenarios,error_scenarios,candidate_step_m,signal_candidate_count,bearing_candidate_count,x_m,y_m,worst_radius_m
+coarse,48,15,3,150.0,55,54,800.0,600.0,52.265940519490734
+medium,96,25,5,100.0,122,120,850.0,-525.0,55.23945437145351
+fine,160,41,7,100.0,124,122,850.0,-525.0,55.40450930733903

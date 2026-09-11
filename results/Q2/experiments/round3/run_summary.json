@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "question": "Q2",
+  "round": "round3",
+  "implementation_target": "python",
+  "random_seed": 2026,
+  "config": {
+    "s1_x": 0.0,
+    "s1_y": 0.0,
+    "first_bearing_deg": 0.0,
+    "bearing_error_deg": 1.0,
+    "arena_x": 0.0,
+    "arena_y": 0.0,
+    "arena_radius_m": 1800.0,
+    "near_radius_m": 5.0,
+    "guaranteed_radius_m": 1000.0,
+    "maximum_radius_m": 1500.0,
+    "disk_sides": 160,
+    "scenario_pool_count": 900,
+    "candidate_step_m": 100.0,
+    "candidate_region_step_m": 50.0,
+    "refinement_step_m": 25.0,
+    "scenario_count": 41,
+    "error_scenario_count": 7,
+    "tie_tolerance_m": 1e-08,
+    "same_location_tolerance_m": 1e-06,
+    "seed": 2026
+  },
+  "approved_decision_id": "q2_conditional_reception_2026-09-11",
+  "status": "success",
+  "execution_time_seconds": 150.4920345999999,
+  "model_assumptions_file": "model_assumptions.md",
+  "model_assumptions_sha256": "377fd28655dcea14241abe67ae677f36c0a52a8c9ef54b6de735c2c171777f91",
+  "candidate_regions": {
+    "signal_region_definition": "for all (G,R) consistent with first success, distance(S2,G) <= R; equivalently distance(S2,G) <= max(1000,distance(S1,G)) for all G",
+    "bearing_region_definition": "signal region plus distance(S2,G) > 5 m for every G",
+    "representation": "uniform-grid approximation over the target scenario pool",
+    "grid_step_m": 50.0,
+    "signal_region_nonempty": true,
+    "bearing_region_nonempty": true,
+    "signal_grid_point_count": 488,
+    "bearing_grid_point_count": 484,
+    "signal_approx_area_m2": 1220000.0,
+    "bearing_approx_area_m2": 1210000.0,
+    "signal_bounds": {
+      "x_min_m": 50.0,
+      "x_max_m": 1000.0,
+      "y_min_m": -850.0,
+      "y_max_m": 850.0,
+      "forward_min_m": 50.0,
+      "forward_max_m": 1000.0,
+      "lateral_min_m": -850.0,
+      "lateral_max_m": 850.0
+    },
+    "bearing_bounds": {
+      "x_min_m": 50.0,
+      "x_max_m": 1000.0,
+      "y_min_m": -850.0,
+      "y_max_m": 850.0,
+      "forward_min_m": 50.0,
+      "forward_max_m": 1000.0,
+      "lateral_min_m": -850.0,
+      "lateral_max_m": 850.0
+    },
+    "scope_note": "counts, areas and bounds approximate the continuous regions and depend on grid/scenario resolution"
+  },
+  "main_result": {
+    "method": "M2-RR",
+    "x": 850.0,
+    "y": -525.0,
+    "movement_m": 999.0620601344043,
+    "discretized_worst_radius_m": 55.40450930733903,
+    "worst_diameter_m": 110.80901861467807,
+    "worst_center_x": 1444.6289456427487,
+    "worst_center_y": 0.8611219456016617,
+    "worst_target_x": 1449.3776657825738,
+    "worst_target_y": 25.298981261743265,
+    "worst_error_deg": -1.0,
+    "sampled_signal_margin_m": 5.141759820249376,
+    "sampled_min_distance_m": 510.1166709084503,
+    "sampled_max_distance_m": 994.8582401797506,
+    "near_scenario_count": 0,
+    "bearing_scenario_count": 287,
+    "min_angle_sine": 0.5127692584244627,
+    "meets_20m_on_discretization": false
+  },
+  "baseline_result": {
+    "method": "M2-ANGLE",
+    "x": 600.0,
+    "y": -800.0,
+    "movement_m": 1000.0,
+    "discretized_worst_radius_m": 60.89243162636792,
+    "worst_diameter_m": 121.78486325273585,
+    "worst_center_x": 1444.5736015081538,
+    "worst_center_y": 0.9674713844123985,
+    "worst_target_x": 1449.3776657825738,
+    "worst_target_y": 25.298981261743265,
+    "worst_error_deg": -0.6666666666666667,
+    "sampled_signal_margin_m": 2.921501626543659,
+    "sampled_min_distance_m": 789.4145303028407,
+    "sampled_max_distance_m": 1221.3263089384195,
+    "near_scenario_count": 0,
+    "bearing_scenario_count": 287,
+    "min_angle_sine": 0.6643638388299197,
+    "meets_20m_on_discretization": false
+  },
+  "methods": [
+    {
+      "method_id": "M2-RR",
+      "role": "main",
+      "script": "code/Q2/q2_robust_second_measurement_optimizer.py",
+      "status": "success",
+      "metrics_summary": {
+        "method": "M2-RR",
+        "x": 850.0,
+        "y": -525.0,
+        "movement_m": 999.0620601344043,
+        "discretized_worst_radius_m": 55.40450930733903,
+        "worst_diameter_m": 110.80901861467807,
+        "worst_center_x": 1444.6289456427487,
+        "worst_center_y": 0.8611219456016617,
+        "worst_target_x": 1449.3776657825738,
+        "worst_target_y": 25.298981261743265,
+        "worst_error_deg": -1.0,
+        "sampled_signal_margin_m": 5.141759820249376,
+        "sampled_min_distance_m": 510.1166709084503,
+        "sampled_max_distance_m": 994.8582401797506,
+        "near_scenario_count": 0,
+        "bearing_scenario_count": 287,
+        "min_angle_sine": 0.5127692584244627,
+        "meets_20m_on_discretization": false
+      },
+      "warnings": [
+        "有限场景近似"
+      ],
+      "errors": []
+    },
+    {
+      "method_id": "M2-ANGLE",
+      "role": "usable_baseline",
+      "script": "code/Q2/q2_angle_baseline.py",
+      "status": "success",
+      "metrics_summary": {
+        "method": "M2-ANGLE",
+        "x": 600.0,
+        "y": -800.0,
+        "movement_m": 1000.0,
+        "discretized_worst_radius_m": 60.89243162636792,
+        "worst_diameter_m": 121.78486325273585,
+        "worst_center_x": 1444.5736015081538,
+        "worst_center_y": 0.9674713844123985,
+        "worst_target_x": 1449.3776657825738,
+        "worst_target_y": 25.298981261743265,
+        "worst_error_deg": -0.6666666666666667,
+        "sampled_signal_margin_m": 2.921501626543659,
+        "sampled_min_distance_m": 789.4145303028407,
+        "sampled_max_distance_m": 1221.3263089384195,
+        "near_scenario_count": 0,
+        "bearing_scenario_count": 287,
+        "min_angle_sine": 0.6643638388299197,
+        "meets_20m_on_discretization": false
+      },
+      "warnings": [
+        "交会角是代理指标"
+      ],
+      "errors": []
+    }
+  ],
+  "comparison": {
+    "radius_improvement_m": 5.48792231902889,
+    "main_within_20m": false,
+    "boundary_validation_passed": true
+  },
+  "fallback_trigger": {
+    "fallback_id": "M2-SLACK",
+    "condition": "conditional signal region empty",
+    "observed": false,
+    "activated": false,
+    "evidence": {
+      "signal_candidate_count": 124
+    }
+  },
+  "outputs": {
+    "candidate_region": "results/Q2/experiments/round3/tables/candidate_region.csv",
+    "comparison": "results/Q2/experiments/round3/tables/candidate_comparison.csv",
+    "sensitivity": "results/Q2/experiments/round3/tables/sensitivity.csv",
+    "boundary": "results/Q2/experiments/round3/tables/boundary_validation.csv",
+    "candidate_figure": "results/Q2/experiments/round3/figures/q2_candidate_region.png",
+    "objective_figure": "results/Q2/experiments/round3/figures/q2_objective_map.png",
+    "metrics": "results/Q2/experiments/round3/metrics/q2_metrics.json"
+  },
+  "environment": {
+    "python": "3.14.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "numpy": "2.5.1",
+    "matplotlib": "3.11.0"
+  }
+}
