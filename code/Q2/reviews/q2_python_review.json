@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "question_id": "Q2",
+  "language": "python",
+  "reviewed_files": [
+    "model_assumptions.md",
+    "qx_method_card.md",
+    "code/Q2/q2_code_plan.md",
+    "code/Q2/minimum_enclosing_circle.py",
+    "code/Q2/q2_robust_second_measurement_optimizer.py",
+    "code/Q2/q2_angle_baseline.py",
+    "code/Q2/run_q2_experiment.py",
+    "tests/Q2/test_q2_optimizer.py",
+    "results/Q2/experiments/round2/run_summary.json"
+  ],
+  "decision_id": "q2_robust_radius_method",
+  "checks": {
+    "syntax": {
+      "status": "PASS",
+      "evidence": [
+        "D:/python/python.exe -m compileall -q code/Q2 tests/Q2返回0",
+        "Q2单元测试10项全部通过"
+      ]
+    },
+    "input_contract": {
+      "status": "PASS",
+      "evidence": [
+        "距离统一使用m，方位角按x轴正向逆时针计",
+        "非法圆边数、near半径和非有限配置均被拒绝",
+        "默认实例明确标记为合成演示而非官方数据"
+      ]
+    },
+    "method_alignment": {
+      "status": "PASS",
+      "evidence": [
+        "每个第二次定位区域均由Omega1外包络与W2做半平面裁剪构造",
+        "回归案例中旧W1与W2交集返回UNBOUNDED，而规范P2得到3顶点有界多边形",
+        "M2-RR为主方法，M2-ANGLE为唯一基线，M2-SLACK未激活"
+      ]
+    },
+    "candidate_feasibility": {
+      "status": "PASS",
+      "evidence": [
+        "主方法点的认证最大距离为999.062060134m，不超过1000m",
+        "主方法点到Omega1外包络的最小距离为510.085494485m，严格大于5m",
+        "100m保证半径案例正确报告严格候选域为空并记录后备触发证据"
+      ]
+    },
+    "boundary_cases": {
+      "status": "PASS",
+      "evidence": [
+        "boundary_validation.csv中6/6项通过",
+        "跨0度、正负误差端点、圆域截断、near约束、接收约束和空候选域均有覆盖"
+      ]
+    },
+    "reproducibility": {
+      "status": "PASS",
+      "evidence": [
+        "固定随机种子2026",
+        "连续两次运行q2_metrics.json的SHA-256均为DCB9E26A0787DAD15C28AF3C9D85B1A43F810A8F97808F9F88422E6EF2F71AA4",
+        "中、细两档最优点均为(850,-525)，半径变化0.165054936m"
+      ]
+    },
+    "output_contract": {
+      "status": "PASS",
+      "evidence": [
+        "round2运行摘要、指标、主基线比较、灵敏度表、边界表和两张中文图均存在",
+        "默认终端输出中文摘要，--json保留机器接口",
+        "主方法半径55.404509307m，基线58.289979619m，二者使用同一评价指标"
+      ]
+    },
+    "numerical_scope": {
+      "status": "PASS",
+      "evidence": [
+        "圆外包络误差由中档0.964258819m降至细档0.347034026m",
+        "候选接收约束使用Omega1外包络，因此具有保守保证",
+        "结果明确标注真实位置与误差最大化为有限场景近似，未声称解析全局最优"
+      ]
+    }
+  },
+  "findings": [],
+  "verdict": "PASSED",
+  "reviewed_at": "2026-09-11T17:24:10+08:00"
+}

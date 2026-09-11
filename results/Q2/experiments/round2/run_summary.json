@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "question": "Q2",
+  "round": "round2",
+  "implementation_target": "python",
+  "random_seed": 2026,
+  "approved_decision_id": "q2_robust_radius_method",
+  "model_assumptions_file": "model_assumptions.md",
+  "model_assumptions_sha256": "dc31c21a42b47f4bf65c2a94042ea6ac5fc6b0cf016056854dfcf70e98060644",
+  "status": "success",
+  "execution_time_seconds": 4.224072899989551,
+  "main_method": "M2-RR",
+  "baseline_method": "M2-ANGLE",
+  "methods": [
+    {
+      "method_id": "M2-RR",
+      "role": "main",
+      "script": "code/Q2/q2_robust_second_measurement_optimizer.py",
+      "status": "success",
+      "metrics_summary": {
+        "method": "M2-RR",
+        "x": 850.0,
+        "y": -525.0,
+        "movement_m": 999.0620601344043,
+        "discretized_worst_radius_m": 55.40450930733903,
+        "worst_diameter_m": 110.80901861467807,
+        "worst_center_x": 1444.6289456427487,
+        "worst_center_y": 0.8611219456016617,
+        "worst_target_x": 1449.3776657825738,
+        "worst_target_y": 25.298981261743265,
+        "worst_error_deg": -1.0,
+        "certified_min_distance_m": 510.08549448541436,
+        "certified_max_distance_m": 999.0620601344043,
+        "min_angle_sine": 0.5127692584244627,
+        "meets_20m_on_discretization": false
+      },
+      "warnings": [
+        "真实位置与测向误差的最坏情形采用有限场景加密。"
+      ],
+      "errors": []
+    },
+    {
+      "method_id": "M2-ANGLE",
+      "role": "usable_baseline",
+      "script": "code/Q2/q2_angle_baseline.py",
+      "status": "success",
+      "metrics_summary": {
+        "method": "M2-ANGLE",
+        "x": 750.0,
+        "y": 625.0,
+        "movement_m": 976.2812094883318,
+        "discretized_worst_radius_m": 58.28997961947519,
+        "worst_diameter_m": 116.57995923895038,
+        "worst_center_x": 1447.4703254528376,
+        "worst_center_y": -0.9169088798788998,
+        "worst_target_x": 1448.227670208416,
+        "worst_target_y": -25.278908014329183,
+        "worst_error_deg": 1.0,
+        "certified_min_distance_m": 611.8155046447819,
+        "certified_max_distance_m": 993.2465832544387,
+        "min_angle_sine": 0.6401843996644798,
+        "meets_20m_on_discretization": false
+      },
+      "warnings": [
+        "交会角仅为定位半径的代理指标。"
+      ],
+      "errors": []
+    }
+  ],
+  "fallback_trigger": {
+    "fallback_id": "M2-SLACK",
+    "condition": "严格候选区域为空",
+    "observed": false,
+    "activated": false,
+    "evidence": {
+      "fine_coarse_feasible_count": 38
+    }
+  },
+  "main_result": {
+    "method": "M2-RR",
+    "x": 850.0,
+    "y": -525.0,
+    "movement_m": 999.0620601344043,
+    "discretized_worst_radius_m": 55.40450930733903,
+    "worst_diameter_m": 110.80901861467807,
+    "worst_center_x": 1444.6289456427487,
+    "worst_center_y": 0.8611219456016617,
+    "worst_target_x": 1449.3776657825738,
+    "worst_target_y": 25.298981261743265,
+    "worst_error_deg": -1.0,
+    "certified_min_distance_m": 510.08549448541436,
+    "certified_max_distance_m": 999.0620601344043,
+    "min_angle_sine": 0.5127692584244627,
+    "meets_20m_on_discretization": false
+  },
+  "baseline_result": {
+    "method": "M2-ANGLE",
+    "x": 750.0,
+    "y": 625.0,
+    "movement_m": 976.2812094883318,
+    "discretized_worst_radius_m": 58.28997961947519,
+    "worst_diameter_m": 116.57995923895038,
+    "worst_center_x": 1447.4703254528376,
+    "worst_center_y": -0.9169088798788998,
+    "worst_target_x": 1448.227670208416,
+    "worst_target_y": -25.278908014329183,
+    "worst_error_deg": 1.0,
+    "certified_min_distance_m": 611.8155046447819,
+    "certified_max_distance_m": 993.2465832544387,
+    "min_angle_sine": 0.6401843996644798,
+    "meets_20m_on_discretization": false
+  },
+  "comparison": {
+    "radius_improvement_m": 2.8854703121361567,
+    "main_within_20m": false,
+    "boundary_validation_passed": true,
+    "convergence": {
+      "medium_to_fine_point_shift_m": 0.0,
+      "medium_to_fine_radius_change_m": 0.16505493588552156,
+      "circle_outer_gap_reduction_m": 0.6172247923947438
+    }
+  },
+  "output_degeneracy": {
+    "strict_candidate_set_empty": false,
+    "main_radius_finite": true,
+    "baseline_radius_finite": true
+  },
+  "outputs": {
+    "metrics": "results/Q2/experiments/round2/metrics/q2_metrics.json",
+    "comparison": "results/Q2/experiments/round2/tables/candidate_comparison.csv",
+    "sensitivity": "results/Q2/experiments/round2/tables/sensitivity.csv",
+    "boundary_validation": "results/Q2/experiments/round2/tables/boundary_validation.csv",
+    "candidate_figure": "results/Q2/experiments/round2/figures/q2_candidate_region.png",
+    "objective_figure": "results/Q2/experiments/round2/figures/q2_objective_map.png"
+  },
+  "environment": {
+    "python": "3.14.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "numpy": "2.5.1",
+    "matplotlib": "3.11.0"
+  }
+}

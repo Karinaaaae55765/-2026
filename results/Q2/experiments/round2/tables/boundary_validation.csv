@@ -1,0 +1,7 @@
+﻿case,criterion,observed,passed
+canonical_p2_replaces_two_wedges,old model unbounded and canonical P2 bounded,old=UNBOUNDED; new_vertices=3,True
+cross_zero_first_bearing,Omega1 remains nonempty at 359.8 degrees,outer_vertices=4,True
+strict_candidate_reception,max distance <= 1000 m,max=999.062060134,True
+strict_candidate_not_near,minimum distance > 5 m,min=510.085494485,True
+bearing_error_endpoints,both -delta and +delta included,True,True
+empty_strict_candidate_set,100 m guarantee triggers fallback evidence,result_is_none=True; trigger=True,True
