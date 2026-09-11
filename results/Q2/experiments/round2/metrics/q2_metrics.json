@@ -87,6 +87,21 @@
     "error_scenario_count": 7,
     "error_endpoints_included": true
   },
+  "candidate_region": {
+    "status": "NONEMPTY",
+    "definition": "for every G in Omega1: distance(S2,G) <= 1000 m and distance(S2,G) > 5 m",
+    "representation": "fine global grid plus long-axis-normal seeds, certified against the Omega1 outer polygon",
+    "fine_candidate_count": 38,
+    "sampled_x_min_m": 600.0,
+    "sampled_x_max_m": 900.0,
+    "sampled_y_min_m": -600.0,
+    "sampled_y_max_m": 600.0,
+    "circle_outer_gap_m": 0.3470340263947769,
+    "optimal_point_is_certified_feasible": true,
+    "optimal_point_certified_max_distance_m": 999.0620601344043,
+    "optimal_point_certified_min_distance_m": 510.08549448541436,
+    "scope_note": "coordinate ranges describe searched feasible points, not the exact boundary of the continuous candidate region"
+  },
   "boundary_cases_passed": 6,
   "boundary_cases": 6,
   "sensitivity_levels": [

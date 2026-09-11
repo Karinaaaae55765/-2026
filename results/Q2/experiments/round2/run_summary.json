@@ -8,7 +8,7 @@
   "model_assumptions_file": "model_assumptions.md",
   "model_assumptions_sha256": "dc31c21a42b47f4bf65c2a94042ea6ac5fc6b0cf016056854dfcf70e98060644",
   "status": "success",
-  "execution_time_seconds": 4.224072899989551,
+  "execution_time_seconds": 3.624318400004995,
   "main_method": "M2-RR",
   "baseline_method": "M2-ANGLE",
   "methods": [
@@ -109,6 +109,21 @@
     "certified_max_distance_m": 993.2465832544387,
     "min_angle_sine": 0.6401843996644798,
     "meets_20m_on_discretization": false
+  },
+  "candidate_region": {
+    "status": "NONEMPTY",
+    "definition": "for every G in Omega1: distance(S2,G) <= 1000 m and distance(S2,G) > 5 m",
+    "representation": "fine global grid plus long-axis-normal seeds, certified against the Omega1 outer polygon",
+    "fine_candidate_count": 38,
+    "sampled_x_min_m": 600.0,
+    "sampled_x_max_m": 900.0,
+    "sampled_y_min_m": -600.0,
+    "sampled_y_max_m": 600.0,
+    "circle_outer_gap_m": 0.3470340263947769,
+    "optimal_point_is_certified_feasible": true,
+    "optimal_point_certified_max_distance_m": 999.0620601344043,
+    "optimal_point_certified_min_distance_m": 510.08549448541436,
+    "scope_note": "coordinate ranges describe searched feasible points, not the exact boundary of the continuous candidate region"
   },
   "comparison": {
     "radius_improvement_m": 2.8854703121361567,

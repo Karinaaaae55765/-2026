@@ -194,6 +194,24 @@ def run(base: Q2Config | None = None) -> dict:
         )
     boundary_rows = _boundary_validation(fine_config, canonical, canonical_evidence)
     boundary_passed = all(bool(row["passed"]) for row in boundary_rows)
+    candidate_region = {
+        "status": "NONEMPTY",
+        "definition": "for every G in Omega1: distance(S2,G) <= 1000 m and distance(S2,G) > 5 m",
+        "representation": "fine global grid plus long-axis-normal seeds, certified against the Omega1 outer polygon",
+        "fine_candidate_count": int(len(canonical_feasible)),
+        "sampled_x_min_m": float(canonical_feasible[:, 0].min()),
+        "sampled_x_max_m": float(canonical_feasible[:, 0].max()),
+        "sampled_y_min_m": float(canonical_feasible[:, 1].min()),
+        "sampled_y_max_m": float(canonical_feasible[:, 1].max()),
+        "circle_outer_gap_m": float(canonical_omega.circle_outer_gap_m),
+        "optimal_point_is_certified_feasible": bool(
+            canonical.certified_max_distance_m <= fine_config.guaranteed_radius_m + 1e-8
+            and canonical.certified_min_distance_m > fine_config.near_radius_m
+        ),
+        "optimal_point_certified_max_distance_m": canonical.certified_max_distance_m,
+        "optimal_point_certified_min_distance_m": canonical.certified_min_distance_m,
+        "scope_note": "coordinate ranges describe searched feasible points, not the exact boundary of the continuous candidate region",
+    }
 
     table_dir = OUTPUT / "tables"
     figure_dir = OUTPUT / "figures"
@@ -221,6 +239,7 @@ def run(base: Q2Config | None = None) -> dict:
         "baseline": baseline.to_dict(),
         "main_candidate_evidence": canonical_evidence,
         "baseline_candidate_evidence": baseline_evidence,
+        "candidate_region": candidate_region,
         "boundary_cases_passed": sum(bool(row["passed"]) for row in boundary_rows),
         "boundary_cases": len(boundary_rows),
         "sensitivity_levels": sensitivity_rows,
@@ -284,6 +303,7 @@ def run(base: Q2Config | None = None) -> dict:
         },
         "main_result": canonical.to_dict(),
         "baseline_result": baseline.to_dict(),
+        "candidate_region": candidate_region,
         "comparison": {
             "radius_improvement_m": baseline.discretized_worst_radius_m - canonical.discretized_worst_radius_m,
             "main_within_20m": canonical.meets_20m_on_discretization,
@@ -317,10 +337,38 @@ def run(base: Q2Config | None = None) -> dict:
 def print_chinese_summary(summary: dict) -> None:
     main = summary["main_result"]
     baseline = summary["baseline_result"]
+    region = summary["candidate_region"]
     print("========== Q2 鲁棒第二检测点运行结果 ==========")
     print(f"运行状态：{'成功' if summary['status'] == 'success' else '失败'}")
     print("定位集合：P2 = Omega1 与 W2 的交集（旧定义已作废）")
     print("算例性质：合成演示，不是题目官方观测数据")
+    print()
+    print("严格候选区域 C：")
+    print(f"  状态：{'非空' if region['status'] == 'NONEMPTY' else '为空'}")
+    print("  约束：对所有 G∈Ω1，第二点到G的距离不超过1000 m且严格大于5 m")
+    print(f"  细层搜索发现候选点：{region['fine_candidate_count']} 个")
+    print(
+        f"  搜索候选点横坐标范围：[{region['sampled_x_min_m']:.3f}, "
+        f"{region['sampled_x_max_m']:.3f}] m"
+    )
+    print(
+        f"  搜索候选点纵坐标范围：[{region['sampled_y_min_m']:.3f}, "
+        f"{region['sampled_y_max_m']:.3f}] m"
+    )
+    print(f"  圆域外包络误差上限：{region['circle_outer_gap_m']:.6f} m")
+    print(
+        "  最优点是否满足候选区域约束："
+        f"{'是' if region['optimal_point_is_certified_feasible'] else '否'}"
+    )
+    print(
+        f"  最优点对Ω1的最大距离："
+        f"{region['optimal_point_certified_max_distance_m']:.6f} m"
+    )
+    print(
+        f"  最优点到Ω1的最小距离："
+        f"{region['optimal_point_certified_min_distance_m']:.6f} m"
+    )
+    print("  注：上述坐标范围是搜索到的可行点范围，不是连续候选域的精确边界。")
     print()
     print("主方法 M2-RR：")
     print(f"  第二检测点：({main['x']:.3f}, {main['y']:.3f}) m")
