@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import math
 import platform
@@ -26,7 +27,8 @@ from q1_geometry import (
 
 SEED = 2026
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-ROUND_DIR = PROJECT_ROOT / "results" / "Q1" / "experiments" / "round1"
+ROUND_DIR = PROJECT_ROOT / "results" / "Q1" / "experiments" / "round2"
+ASSUMPTIONS_PATH = PROJECT_ROOT / "model_assumptions.md"
 
 
 def bearing(source: tuple[float, float], detector: tuple[float, float]) -> float:
@@ -49,6 +51,7 @@ def main() -> None:
     figures_dir = ROUND_DIR / "figures"
     for directory in (tables_dir, metrics_dir, figures_dir):
         directory.mkdir(parents=True, exist_ok=True)
+    assumptions_sha256 = hashlib.sha256(ASSUMPTIONS_PATH.read_bytes()).hexdigest()
 
     true_source = (300.0, 200.0)
     bounded_observations = observations_for(
@@ -65,6 +68,11 @@ def main() -> None:
         "bounded_consistency": (bounded_observations, true_source, "OK"),
         "cross_zero": (cross_zero_observations, cross_zero_source, "OK"),
         "unbounded_single_wedge": ([Observation(0.0, 0.0, 20.0)], None, "UNBOUNDED"),
+        "unbounded_high_coordinate_wraparound": (
+            [Observation(1_000_000.0, -1_000_000.0, 359.999999)],
+            None,
+            "UNBOUNDED",
+        ),
         "empty_opposed_shifted": (
             [Observation(0.0, 0.0, 0.0), Observation(0.0, 10.0, 180.0)],
             None,
@@ -95,6 +103,7 @@ def main() -> None:
                 "diameter_m": "" if result["diameter"] is None else f"{result['diameter']:.12g}",
                 "covers_region": "" if result["diameter_circle"] is None else result["diameter_circle"]["covers_region"],
                 "true_source_feasible": "" if contains_source is None else contains_source,
+                "max_constraint_violation": result["diagnostics"].get("maximum_constraint_violation", ""),
                 "passed": passed,
             }
         )
@@ -119,6 +128,7 @@ def main() -> None:
             "diameter_m": "" if boundary_result["diameter"] is None else f"{boundary_result['diameter']:.12g}",
             "covers_region": boundary_result["diameter_circle"]["covers_region"],
             "true_source_feasible": boundary_feasible,
+            "max_constraint_violation": boundary_result["diagnostics"].get("maximum_constraint_violation", ""),
             "passed": boundary_passed,
         }
     )
@@ -138,6 +148,7 @@ def main() -> None:
             "diameter_m": f"{triangle_diameter:.12g}",
             "covers_region": triangle_circle["covers_region"],
             "true_source_feasible": "",
+            "max_constraint_violation": "",
             "passed": triangle_passed,
         }
     )
@@ -154,6 +165,19 @@ def main() -> None:
         max_difference = max(max_difference, abs(main_diameter - baseline_diameter))
     random_passed = max_difference <= 1e-10
 
+    reversed_result = localize_source(list(reversed(bounded_observations)))
+    order_invariance_passed = (
+        reversed_result["status"] == results["bounded_consistency"]["status"]
+        and math.isclose(
+            reversed_result["diameter"],
+            results["bounded_consistency"]["diameter"],
+            rel_tol=0.0,
+            abs_tol=1e-8,
+        )
+        and reversed_result["diameter_circle"]["covers_region"]
+        == results["bounded_consistency"]["diameter_circle"]["covers_region"]
+    )
+
     table_path = tables_dir / "validation_cases.csv"
     with table_path.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
@@ -166,6 +190,7 @@ def main() -> None:
     all_deterministic_passed = all(bool(row["passed"]) for row in rows)
     metrics = {
         "schema_version": 1,
+        "model_assumptions_sha256": assumptions_sha256,
         "random_seed": SEED,
         "deterministic_cases": len(rows),
         "deterministic_cases_passed": sum(bool(row["passed"]) for row in rows),
@@ -173,6 +198,7 @@ def main() -> None:
         "random_convex_polygons_compared": random_cases,
         "max_main_baseline_diameter_difference": max_difference,
         "random_comparison_passed": random_passed,
+        "observation_order_invariance_passed": order_invariance_passed,
         "bounded_example": {
             "num_vertices": len(results["bounded_consistency"]["vertices_ccw"]),
             "diameter_m": results["bounded_consistency"]["diameter"],
@@ -194,14 +220,16 @@ def main() -> None:
     save_json(metrics_path, metrics)
 
     elapsed = time.perf_counter() - started
-    success = all_deterministic_passed and random_passed
+    success = all_deterministic_passed and random_passed and order_invariance_passed
     run_summary = {
         "schema_version": 1,
         "question": "Q1",
-        "round": "round1",
+        "round": "round2",
         "implementation_target": "python",
         "random_seed": SEED,
-        "approved_decision_id": "q1_model_assumptions_2026-09-10",
+        "approved_decision_id": "q1_model_assumptions_canonical_2026-09-11",
+        "model_assumptions_file": "model_assumptions.md",
+        "model_assumptions_sha256": assumptions_sha256,
         "methods": [
             {
                 "method_id": "wedge_intersection_rotating_calipers",
@@ -210,12 +238,13 @@ def main() -> None:
                 "status": "success" if success else "failed",
                 "execution_time_seconds": elapsed,
                 "input_files": ["model_assumptions.md"],
-                "output_files": [str(table_path.relative_to(PROJECT_ROOT)), str(metrics_path.relative_to(PROJECT_ROOT))],
-                "figure_files": [str(figure_path.relative_to(PROJECT_ROOT))],
+                "output_files": [table_path.relative_to(PROJECT_ROOT).as_posix(), metrics_path.relative_to(PROJECT_ROOT).as_posix()],
+                "figure_files": [figure_path.relative_to(PROJECT_ROOT).as_posix()],
                 "metrics_summary": {
                     "deterministic_cases_passed": metrics["deterministic_cases_passed"],
                     "deterministic_cases": metrics["deterministic_cases"],
                     "random_comparison_passed": random_passed,
+                    "observation_order_invariance_passed": order_invariance_passed,
                 },
                 "warnings": ["No official numeric Q1 observation set was supplied; validation uses deterministic constructed cases."],
                 "errors": [] if success else ["One or more validation checks failed."],
@@ -227,7 +256,7 @@ def main() -> None:
                 "status": "success" if random_passed else "failed",
                 "execution_time_seconds": elapsed,
                 "input_files": [],
-                "output_files": [str(metrics_path.relative_to(PROJECT_ROOT))],
+                "output_files": [metrics_path.relative_to(PROJECT_ROOT).as_posix()],
                 "figure_files": [],
                 "metrics_summary": {"max_diameter_difference": max_difference},
                 "warnings": [],
@@ -263,4 +292,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

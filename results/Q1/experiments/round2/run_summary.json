@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "question": "Q1",
+  "round": "round2",
+  "implementation_target": "python",
+  "random_seed": 2026,
+  "approved_decision_id": "q1_model_assumptions_canonical_2026-09-11",
+  "model_assumptions_file": "model_assumptions.md",
+  "model_assumptions_sha256": "dc31c21a42b47f4bf65c2a94042ea6ac5fc6b0cf016056854dfcf70e98060644",
+  "methods": [
+    {
+      "method_id": "wedge_intersection_rotating_calipers",
+      "role": "main",
+      "script": "code/Q1/q1_geometry.py",
+      "status": "success",
+      "execution_time_seconds": 0.6128500999911921,
+      "input_files": [
+        "model_assumptions.md"
+      ],
+      "output_files": [
+        "results/Q1/experiments/round2/tables/validation_cases.csv",
+        "results/Q1/experiments/round2/metrics/q1_metrics.json"
+      ],
+      "figure_files": [
+        "results/Q1/experiments/round2/figures/q1_example.png"
+      ],
+      "metrics_summary": {
+        "deterministic_cases_passed": 8,
+        "deterministic_cases": 8,
+        "random_comparison_passed": true,
+        "observation_order_invariance_passed": true
+      },
+      "warnings": [
+        "No official numeric Q1 observation set was supplied; validation uses deterministic constructed cases."
+      ],
+      "errors": []
+    },
+    {
+      "method_id": "vertex_pair_enumeration",
+      "role": "usable_baseline",
+      "script": "code/Q1/q1_baseline.py",
+      "status": "success",
+      "execution_time_seconds": 0.6128500999911921,
+      "input_files": [],
+      "output_files": [
+        "results/Q1/experiments/round2/metrics/q1_metrics.json"
+      ],
+      "figure_files": [],
+      "metrics_summary": {
+        "max_diameter_difference": 0.0
+      },
+      "warnings": [],
+      "errors": []
+    }
+  ],
+  "comparison": {
+    "metric": "absolute diameter difference",
+    "cases": 250,
+    "maximum_difference": 0.0,
+    "passed": true
+  },
+  "fallback_trigger": {
+    "fallback_id": null,
+    "condition": null,
+    "observed": false,
+    "evidence": null
+  },
+  "environment": {
+    "python": "3.14.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "numpy": "2.5.1",
+    "matplotlib": "3.11.0"
+  }
+}

@@ -1,14 +1,14 @@
-# Q1 Python 实现计划
+# Q1 Python 唯一实现计划（规范化第二轮）
 
 ## 实现目标
 
-根据 `model_assumptions.md` 中团队确认的 Q1 模型，实现带确定性角度误差的交会定位区域、凸多边形直径和直径端点圆覆盖判定。
+以根目录 `model_assumptions.md` 为唯一数学口径，实现带确定性角度误差的交会定位区域、凸多边形直径和直径端点圆覆盖判定。运行汇总必须记录该文件的 SHA-256；摘要、旧图片和论文笔记不得覆盖其中的定义。
 
 ## 决策与范围
 
 - 实现语言：Python 3。
-- 实验轮次：`round1`。
-- 决策标识：`q1_model_assumptions_2026-09-10`。
+- 实验轮次：`round2`，保留 `round1` 作为历史证据。
+- 决策标识：`q1_model_assumptions_canonical_2026-09-11`。
 - 主方法：角域半平面求交、Andrew 单调链凸包、旋转卡壳最远点对。
 - 可用基线：在同一凸包上枚举全部顶点对，时间复杂度为 O(m^2)。
 - 不实现概率误差、拟合定位、目标圆裁剪、接收半径、频道、移动或模拟器接口。
@@ -35,7 +35,7 @@
 
 ## 输出契约
 
-输出状态为 `OK`、`DEGENERATE`、`EMPTY` 或 `UNBOUNDED`，并包含逆时针顶点、直径、直径端点、直径圆覆盖结果及诊断信息。仅 `OK` 和 `DEGENERATE` 返回有限直径。
+输出状态为 `OK`、`DEGENERATE`、`EMPTY` 或 `UNBOUNDED`，并包含逆时针顶点、直径、直径端点、直径圆覆盖结果及诊断信息。仅 `OK` 和 `DEGENERATE` 返回有限直径。诊断至少记录候选/可行/拒绝交点数、尺度容差、凸包面积；有限区域还记录最大约束违反量，无界区域记录一个可行的齐次方向见证。
 
 ## 计算步骤
 
@@ -67,10 +67,10 @@
 
 ## 输出文件
 
-- 表格：`results/Q1/experiments/round1/tables/validation_cases.csv`
-- 指标：`results/Q1/experiments/round1/metrics/q1_metrics.json`
-- 图形：`results/Q1/experiments/round1/figures/q1_example.png`
-- 汇总：`results/Q1/experiments/round1/run_summary.json`
+- 表格：`results/Q1/experiments/round2/tables/validation_cases.csv`
+- 指标：`results/Q1/experiments/round2/metrics/q1_metrics.json`
+- 图形：`results/Q1/experiments/round2/figures/q1_example.png`（诊断图，不加标题）
+- 汇总：`results/Q1/experiments/round2/run_summary.json`
 - 审查：`code/Q1/reviews/q1_python_review.json`
 
 ## 命名检查

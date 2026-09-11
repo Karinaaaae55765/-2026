@@ -68,6 +68,16 @@ def unit_vector(angle_deg: float) -> Vector:
     return (math.cos(theta), math.sin(theta))
 
 
+def _validate_delta(delta_deg: float) -> None:
+    if not math.isfinite(delta_deg) or not 0.0 < delta_deg < 90.0:
+        raise ValueError("delta_deg must be finite and satisfy 0 < delta_deg < 90")
+
+
+def _validate_positive_tolerance(value: float, name: str) -> None:
+    if not math.isfinite(value) or value <= 0.0:
+        raise ValueError(f"{name} must be a positive finite number")
+
+
 def _coerce_observations(items: Sequence[Observation | Mapping[str, Any]]) -> list[Observation]:
     if not items:
         raise ValueError("observations must contain at least one record")
@@ -91,6 +101,7 @@ def _coerce_observations(items: Sequence[Observation | Mapping[str, Any]]) -> li
 def build_geometry(
     observations: Sequence[Observation], delta_deg: float
 ) -> tuple[list[HalfPlane], list[Boundary]]:
+    _validate_delta(delta_deg)
     halfplanes: list[HalfPlane] = []
     boundaries: list[Boundary] = []
     for obs in observations:
@@ -144,15 +155,20 @@ def point_in_all_wedges(
     delta_deg: float = 1.0,
     tol: float = 1e-9,
 ) -> bool:
+    if len(point) != 2 or not all(math.isfinite(float(value)) for value in point):
+        raise ValueError("point must contain two finite coordinates")
+    _validate_delta(delta_deg)
+    _validate_positive_tolerance(tol, "tol")
     coerced = _coerce_observations(observations)
     halfplanes, _ = build_geometry(coerced, delta_deg)
     return point_is_feasible(point, halfplanes, tol)
 
 
-def has_recession_direction(
+def find_recession_direction(
     halfplanes: Sequence[HalfPlane], boundaries: Sequence[Boundary], tol_direction: float = 1e-12
-) -> bool:
-    """Return whether the homogeneous half-planes admit a nonzero direction."""
+) -> Vector | None:
+    """Return a unit recession direction, or ``None`` when the region is bounded."""
+    _validate_positive_tolerance(tol_direction, "tol_direction")
     candidates: list[Vector] = []
     for boundary in boundaries:
         candidates.append(boundary.direction)
@@ -163,8 +179,15 @@ def has_recession_direction(
             >= -tol_direction
             for halfplane in halfplanes
         ):
-            return True
-    return False
+            return direction
+    return None
+
+
+def has_recession_direction(
+    halfplanes: Sequence[HalfPlane], boundaries: Sequence[Boundary], tol_direction: float = 1e-12
+) -> bool:
+    """Return whether the homogeneous half-planes admit a nonzero direction."""
+    return find_recession_direction(halfplanes, boundaries, tol_direction) is not None
 
 
 def unique_points(points: Iterable[Point], tol: float) -> list[Point]:
@@ -294,12 +317,10 @@ def localize_source(
 ) -> dict[str, Any]:
     """Construct the feasible region and compute its finite diameter when defined."""
     coerced = _coerce_observations(observations)
-    if not math.isfinite(delta_deg) or not 0.0 < delta_deg < 90.0:
-        raise ValueError("delta_deg must be finite and satisfy 0 < delta_deg < 90")
+    _validate_delta(delta_deg)
     if tol is not None and (not math.isfinite(tol) or tol <= 0.0):
         raise ValueError("tol must be a positive finite number or None")
-    if not math.isfinite(tol_parallel) or tol_parallel <= 0.0:
-        raise ValueError("tol_parallel must be a positive finite number")
+    _validate_positive_tolerance(tol_parallel, "tol_parallel")
 
     halfplanes, boundaries = build_geometry(coerced, delta_deg)
     raw_candidates: list[Point] = []
@@ -315,16 +336,18 @@ def localize_source(
         *(abs(value) for point in raw_candidates for value in point),
     )
     geometry_tol = tol if tol is not None else 1e-9 * scale
-    feasible = [
+    feasible_raw = [
         point for point in raw_candidates if point_is_feasible(point, halfplanes, geometry_tol)
     ]
-    feasible = unique_points(feasible, geometry_tol)
+    feasible = unique_points(feasible_raw, geometry_tol)
 
     diagnostics: dict[str, Any] = {
         "num_observations": len(coerced),
         "num_boundary_lines": len(boundaries),
         "num_candidate_intersections": len(raw_candidates),
+        "num_feasible_intersections_before_deduplication": len(feasible_raw),
         "num_feasible_intersections": len(feasible),
+        "num_rejected_intersections": len(raw_candidates) - len(feasible_raw),
         "coordinate_scale": scale,
         "tolerance": geometry_tol,
         "tol_parallel": tol_parallel,
@@ -343,8 +366,22 @@ def localize_source(
     area_tol = geometry_tol * scale
     hull = convex_hull(feasible, area_tol)
     diagnostics["hull_area"] = polygon_area(hull)
+    diagnostics["area_tolerance"] = area_tol
+    residuals = [
+        _constraint_residual(halfplane, point)
+        for point in hull
+        for halfplane in halfplanes
+    ]
+    diagnostics["minimum_constraint_residual"] = min(residuals, default=None)
+    diagnostics["maximum_constraint_violation"] = max(
+        (max(0.0, -residual) for residual in residuals), default=0.0
+    )
 
-    if has_recession_direction(halfplanes, boundaries):
+    recession_direction = find_recession_direction(halfplanes, boundaries, tol_parallel)
+    diagnostics["recession_direction"] = (
+        None if recession_direction is None else list(recession_direction)
+    )
+    if recession_direction is not None:
         return {
             "status": "UNBOUNDED",
             "vertices_ccw": [list(point) for point in hull],
@@ -432,7 +469,6 @@ def plot_localization(
     ax.set_aspect("equal", adjustable="datalim")
     ax.set_xlabel("x (m, east)")
     ax.set_ylabel("y (m, north)")
-    ax.set_title("Q1 bearing-intersection localization")
     ax.grid(True, alpha=0.25)
     ax.legend(loc="best")
     output = Path(output_path)
@@ -466,4 +502,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
