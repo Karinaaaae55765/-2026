@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "question_id": "Q4",
+  "language": "python",
+  "reviewed_files": [
+    "code/Q4/q4_code_plan_v5.md",
+    "code/Q4/q4_state_filter_v5.py",
+    "code/Q4/q4_task_scheduler_v5.py",
+    "code/Q4/q4_controller_v5.py",
+    "code/Q4/run_q4_live_v5.py",
+    "code/Q4/run_q4_experiment_v5.py",
+    "tests/Q4/test_q4_v5_rebuild.py"
+  ],
+  "decision_id": "Q4-V5_low_count_rebuild_user_confirmed_2026-09-12",
+  "checks": {
+    "syntax": {
+      "status": "PASS",
+      "evidence": ["五个V5 Python模块通过py_compile", "V5专项4项测试与Q4相关8项回归测试全部通过"]
+    },
+    "input_contract": {
+      "status": "PASS",
+      "evidence": ["正式入口仅从命令行接收robot-id和base-url", "控制器明确忽略enter响应中的真实源数"]
+    },
+    "method_alignment": {
+      "status": "PASS",
+      "evidence": ["25点模板最大相交三角边988.440309米，小于1000米", "仅以连续几何证书或16源数量上界判定ABSENT", "Q2补测、覆盖和清除任务实际进入统一调度调用"]
+    },
+    "reproducibility": {
+      "status": "PASS",
+      "evidence": ["离线场景使用固定种子", "run_summary记录Python版本、平台、输入输出和告警"]
+    },
+    "output_contract": {
+      "status": "PASS",
+      "evidence": ["round5比较表、指标文件和run_summary已生成", "中文自检和中文正式摘要字段完整"]
+    },
+    "performance_target": {
+      "status": "FAIL",
+      "evidence": ["10至12源池化秒/源由826.971降至757.183，改善8.44%", "11个场景整体由730.420降至701.534，改善3.95%", "仍未达到480秒/源团队目标"]
+    }
+  },
+  "findings": [
+    {
+      "severity": "WARNING",
+      "message": "V5在10源全定向边界压力例为883.153秒/源，差于V4的843.955秒/源；真实10源分布仍须演练验证。"
+    },
+    {
+      "severity": "INFO",
+      "message": "16源全定向压力例V5为557.250秒/源，V4为554.981秒/源，退化0.41%，在3%回归上限内。"
+    }
+  ],
+  "verdict": "FAILED_PERFORMANCE_TARGET",
+  "reviewed_at": "2026-09-12T21:28:12+08:00"
+}

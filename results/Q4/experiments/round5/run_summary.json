@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "question_id": "Q4",
+  "approved_decision_id": "Q4-V5_low_count_rebuild_user_confirmed_2026-09-12",
+  "method_roles": {
+    "main": "Q4-V5-LOW-COUNT-JOINT",
+    "baseline": "Q4-V4-DYNAMIC",
+    "fallback": "Q4-V3 strict mesh"
+  },
+  "inputs": [
+    "D:\\2026国赛B题\\B题.pdf",
+    "D:\\2026国赛B题\\Q4.qx_method_card.md",
+    "D:\\2026国赛B题\\code\\Q4\\q4_code_plan_v5.md"
+  ],
+  "outputs": [
+    "D:\\2026国赛B题\\results\\Q4\\experiments\\round5\\tables\\policy_comparison.csv",
+    "D:\\2026国赛B题\\results\\Q4\\experiments\\round5\\metrics\\q4_v5_metrics.json"
+  ],
+  "seed": 2026,
+  "environment": {
+    "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0"
+  },
+  "execution_status": "SUCCESS",
+  "metrics": {
+    "q4_v5": {
+      "run_count": 11,
+      "successful_runs": 11,
+      "pooled_seconds_per_source": 701.5342690815123,
+      "mean_movement_m": 32037.99638951029,
+      "mean_measurements": 342.72727272727275,
+      "mean_clear_failures": 10.818181818181818,
+      "all_cleared_100_percent": true,
+      "all_runtime_source_count_unused": true
+    },
+    "q4_v4": {
+      "run_count": 11,
+      "successful_runs": 11,
+      "pooled_seconds_per_source": 730.4196502174663,
+      "mean_movement_m": 33104.65142233656,
+      "mean_measurements": 353.8181818181818,
+      "mean_clear_failures": 34.90909090909091,
+      "all_cleared_100_percent": true,
+      "all_runtime_source_count_unused": true
+    },
+    "low_count_10_to_12_v5": {
+      "run_count": 7,
+      "successful_runs": 7,
+      "pooled_seconds_per_source": 757.1830247593543,
+      "mean_movement_m": 30216.364201222084,
+      "mean_measurements": 351.57142857142856,
+      "mean_clear_failures": 8.571428571428571,
+      "all_cleared_100_percent": true,
+      "all_runtime_source_count_unused": true
+    },
+    "low_count_10_to_12_v4": {
+      "run_count": 7,
+      "successful_runs": 7,
+      "pooled_seconds_per_source": 826.9708050694073,
+      "mean_movement_m": 33180.557989482106,
+      "mean_measurements": 366.7142857142857,
+      "mean_clear_failures": 33.714285714285715,
+      "all_cleared_100_percent": true,
+      "all_runtime_source_count_unused": true
+    },
+    "low_count_improvement_percent": 8.438965424443944,
+    "overall_improvement_percent": 3.9546281548359152,
+    "target_seconds_per_source": 480.0,
+    "target_met": false
+  },
+  "output_degeneracy": {
+    "failed_runs": 0,
+    "zero_clear_runs": 0
+  },
+  "fallback_trigger_state": {
+    "strict_mesh_fallback_runs": 0,
+    "wedge_fallback_runs": 7
+  },
+  "warnings": [
+    "离线场景不代表官方随机分布。",
+    "480秒/源是团队目标，并非题面阈值。",
+    "10源极端边界场景可能不优于V4。"
+  ]
+}

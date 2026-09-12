@@ -1,0 +1,46 @@
+{
+  "q4_v5": {
+    "run_count": 11,
+    "successful_runs": 11,
+    "pooled_seconds_per_source": 701.5342690815123,
+    "mean_movement_m": 32037.99638951029,
+    "mean_measurements": 342.72727272727275,
+    "mean_clear_failures": 10.818181818181818,
+    "all_cleared_100_percent": true,
+    "all_runtime_source_count_unused": true
+  },
+  "q4_v4": {
+    "run_count": 11,
+    "successful_runs": 11,
+    "pooled_seconds_per_source": 730.4196502174663,
+    "mean_movement_m": 33104.65142233656,
+    "mean_measurements": 353.8181818181818,
+    "mean_clear_failures": 34.90909090909091,
+    "all_cleared_100_percent": true,
+    "all_runtime_source_count_unused": true
+  },
+  "low_count_10_to_12_v5": {
+    "run_count": 7,
+    "successful_runs": 7,
+    "pooled_seconds_per_source": 757.1830247593543,
+    "mean_movement_m": 30216.364201222084,
+    "mean_measurements": 351.57142857142856,
+    "mean_clear_failures": 8.571428571428571,
+    "all_cleared_100_percent": true,
+    "all_runtime_source_count_unused": true
+  },
+  "low_count_10_to_12_v4": {
+    "run_count": 7,
+    "successful_runs": 7,
+    "pooled_seconds_per_source": 826.9708050694073,
+    "mean_movement_m": 33180.557989482106,
+    "mean_measurements": 366.7142857142857,
+    "mean_clear_failures": 33.714285714285715,
+    "all_cleared_100_percent": true,
+    "all_runtime_source_count_unused": true
+  },
+  "low_count_improvement_percent": 8.438965424443944,
+  "overall_improvement_percent": 3.9546281548359152,
+  "target_seconds_per_source": 480.0,
+  "target_met": false
+}
