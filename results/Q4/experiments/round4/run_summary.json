@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "question_id": "Q4",
+  "approved_decision_id": "Q4-V4_dynamic_rebuild_user_confirmed_2026-09-12",
+  "method_roles": {
+    "main": "Q4-V4-DYNAMIC",
+    "baseline": "Q4-V3-UNKNOWN"
+  },
+  "inputs": [
+    "D:\\2026国赛B题\\B题.pdf",
+    "D:\\2026国赛B题\\Q4.qx_method_card.md",
+    "D:\\2026国赛B题\\code\\Q4\\q4_code_plan_v4.md"
+  ],
+  "outputs": [
+    "D:\\2026国赛B题\\results\\Q4\\experiments\\round4\\tables\\policy_comparison.csv",
+    "D:\\2026国赛B题\\results\\Q4\\experiments\\round4\\metrics\\q4_v4_metrics.json"
+  ],
+  "seed": 2026,
+  "environment": {
+    "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0"
+  },
+  "execution_status": "SUCCESS",
+  "metrics": {
+    "q4_v4_dynamic": {
+      "run_count": 7,
+      "successful_runs": 7,
+      "pooled_seconds_per_source": 691.5843881544972,
+      "mean_movement_m": 33646.556658613714,
+      "mean_measurements": 353.2857142857143,
+      "all_cleared_100_percent": true,
+      "all_runtime_source_count_unused": true
+    },
+    "q4_v3_unknown": {
+      "run_count": 7,
+      "successful_runs": 7,
+      "pooled_seconds_per_source": 717.9758239753696,
+      "mean_movement_m": 35944.857129827586,
+      "mean_measurements": 347.42857142857144,
+      "all_cleared_100_percent": true,
+      "all_runtime_source_count_unused": true
+    },
+    "improvement_vs_v3_percent": 3.6758112097347917,
+    "target_seconds_per_source": 480.0,
+    "target_met": false
+  },
+  "output_degeneracy": {
+    "failed_runs": 0,
+    "zero_clear_runs": 0
+  },
+  "fallback_trigger_state": {
+    "dynamic_fallback_runs": 0
+  },
+  "warnings": [
+    "离线场景不代表官方随机分布。",
+    "480秒/源是团队平均目标，并非题面阈值。"
+  ]
+}

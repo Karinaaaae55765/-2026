@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "question_id": "Q4",
+  "language": "python",
+  "reviewed_files": [
+    "code/Q4/q4_code_plan_v4.md",
+    "code/Q4/q4_dynamic_certificate_v4.py",
+    "code/Q4/q4_task_scheduler_v4.py",
+    "code/Q4/q4_controller_v4.py",
+    "code/Q4/run_q4_live_v4.py",
+    "code/Q4/run_q4_experiment_v4.py",
+    "tests/Q4/test_q4_v4_dynamic.py"
+  ],
+  "decision_id": "Q4-V4_dynamic_rebuild_user_confirmed_2026-09-12",
+  "checks": {
+    "syntax": {
+      "status": "PASS",
+      "evidence": ["V4五个Python模块及测试通过py_compile", "2项动态证书与未知源数unittest通过", "7组V4和7组V3对照均成功运行"]
+    },
+    "input_contract": {
+      "status": "PASS",
+      "evidence": ["正式入口不接收源数参数", "控制器忽略enter响应中的源数元数据", "伪造jammer_count=16的10源场景仍按未知源数严格完成"]
+    },
+    "method_alignment": {
+      "status": "PASS",
+      "evidence": ["18点1873米外环、9点995米内环和原点构成动态证书模板", "连续圆域凸包覆盖与Delaunay相交三角形边长均显式验证", "单点no_signal不裁剪位置，16源停止只使用题面上界"]
+    },
+    "reproducibility": {
+      "status": "PASS",
+      "evidence": ["固定配置种子2026及7个固定场景种子", "run_summary保存Python和平台环境", "最终实验重复执行得到完整输出"]
+    },
+    "output_contract": {
+      "status": "PASS",
+      "evidence": ["round4比较表、指标和run_summary可解析且相互一致", "主方法与V3基线均使用未知源数口径", "14次运行0失败、0零清除"]
+    },
+    "performance_target": {
+      "status": "FAIL",
+      "evidence": ["V4汇总691.584秒/源，高于480秒/源", "相对V3的717.976秒/源提升3.68%", "V4逐场范围554.981至861.347秒/源，7组均未触发动态后备"]
+    }
+  },
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "结构重建有效但未达到平均480秒/源",
+      "evidence": "V4平均移动距离33646.557米，较V3的35944.857米下降约6.39%，但平均检测次数由347.429增至353.286，且低源数和不利定向场景仍需要完整不存在证书。",
+      "recommended_next_action": "先用真实模拟器检验双环证书对官方分布的收益；若真实平均仍明显高于480，应进一步研究连续位置—发射方向联合状态对no_signal的安全裁剪，而不是泄露或猜测实际源数。"
+    }
+  ],
+  "verdict": "FAILED_PERFORMANCE_TARGET",
+  "reviewed_at": "2026-09-12T20:37:59.6116029+08:00"
+}
