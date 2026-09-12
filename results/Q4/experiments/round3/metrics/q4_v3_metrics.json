@@ -1,0 +1,23 @@
+{
+  "q4_v3_unknown": {
+    "run_count": 7,
+    "successful_runs": 7,
+    "pooled_seconds_per_source": 789.6392261317269,
+    "mean_movement_m": 41380.83541284797,
+    "mean_measurements": 321.57142857142856,
+    "all_cleared_100_percent": true,
+    "all_runtime_source_count_unused": true
+  },
+  "q4_base": {
+    "run_count": 7,
+    "successful_runs": 7,
+    "pooled_seconds_per_source": 795.8155827797407,
+    "mean_movement_m": 38980.87002354029,
+    "mean_measurements": 414.57142857142856,
+    "all_cleared_100_percent": true,
+    "all_runtime_source_count_unused": true
+  },
+  "improvement_vs_base_percent": 0.776104009730505,
+  "target_seconds_per_source": 480.0,
+  "target_met": false
+}

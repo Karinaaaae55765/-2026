@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "question_id": "Q4",
+  "approved_decision_id": "Q4-V3_unknown_count_user_confirmed_2026-09-12",
+  "method_roles": {
+    "main": "Q4-V3-UNKNOWN",
+    "baseline": "Q4-BASE"
+  },
+  "inputs": [
+    "D:\\2026国赛B题\\B题.pdf",
+    "D:\\2026国赛B题\\Q4.qx_method_card.md",
+    "D:\\2026国赛B题\\code\\Q4\\q4_code_plan_v3.md"
+  ],
+  "outputs": [
+    "D:\\2026国赛B题\\results\\Q4\\experiments\\round3\\tables\\policy_comparison.csv",
+    "D:\\2026国赛B题\\results\\Q4\\experiments\\round3\\metrics\\q4_v3_metrics.json"
+  ],
+  "seed": 2026,
+  "environment": {
+    "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0"
+  },
+  "execution_status": "SUCCESS",
+  "metrics": {
+    "q4_v3_unknown": {
+      "run_count": 7,
+      "successful_runs": 7,
+      "pooled_seconds_per_source": 789.6392261317269,
+      "mean_movement_m": 41380.83541284797,
+      "mean_measurements": 321.57142857142856,
+      "all_cleared_100_percent": true,
+      "all_runtime_source_count_unused": true
+    },
+    "q4_base": {
+      "run_count": 7,
+      "successful_runs": 7,
+      "pooled_seconds_per_source": 795.8155827797407,
+      "mean_movement_m": 38980.87002354029,
+      "mean_measurements": 414.57142857142856,
+      "all_cleared_100_percent": true,
+      "all_runtime_source_count_unused": true
+    },
+    "improvement_vs_base_percent": 0.776104009730505,
+    "target_seconds_per_source": 480.0,
+    "target_met": false
+  },
+  "output_degeneracy": {
+    "failed_runs": 0,
+    "zero_clear_runs": 0
+  },
+  "fallback_trigger_state": {
+    "source_count_available": false,
+    "full_certificate_required": true
+  },
+  "warnings": [
+    "离线场景只验证算法逻辑，不代表官方随机分布。",
+    "480秒/源是团队目标，不是题面阈值。"
+  ],
+  "mesh_certificate": {
+    "vertex_count": 27,
+    "triangle_count": 37,
+    "maximum_edge_m": 950.0,
+    "edge_strictly_below_minimum_radius": true,
+    "all_retained_triangles_intersect_arena": true
+  }
+}
